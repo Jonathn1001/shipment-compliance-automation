@@ -1,0 +1,66 @@
+### Shipment Compliance Automation — API examples
+### Use with the VS Code REST Client extension. Backend defaults to :3000.
+@base = http://localhost:3000
+
+### Create a shipment (only shipmentReference is required)
+# @name create
+POST {{base}}/shipments
+Content-Type: application/json
+
+{
+  "shipmentReference": "SAF-IMP-2026-0007",
+  "exporter": "Shenzhen Widgets Co",
+  "importer": "Acme Importers Ltd",
+  "hsCode": "8471.30",
+  "goodsDescription": "Laptop computers",
+  "countryOfOrigin": "DE",
+  "billOfLadingNumber": "BL-88231",
+  "invoiceValue": 12500.50,
+  "currency": "USD",
+  "containerNumber": "CSQU3054383",
+  "grossWeightKg": 1040,
+  "netWeightKg": 1000,
+  "packagingType": "Plastic"
+}
+
+### Capture the created id for the calls below
+@id = {{create.response.body.data.id}}
+
+### List shipments (each row includes openIssueCount)
+GET {{base}}/shipments
+
+### Get one shipment
+GET {{base}}/shipments/{{id}}
+
+### Ingest a document (envelope validated; payload is freeform)
+POST {{base}}/shipments/{{id}}/documents
+Content-Type: application/json
+
+{
+  "documentType": "COMMERCIAL_INVOICE",
+  "sourceType": "JSON",
+  "payload": { "seller": "Shenzhen Widgets Co", "buyer": "Acme Importers Ltd", "total_value": 12500.50 }
+}
+
+### Run validation (x-actor optional; defaults to "system")
+POST {{base}}/shipments/{{id}}/validate
+x-actor: reviewer@safiri
+
+### Read issues
+GET {{base}}/shipments/{{id}}/issues
+
+### Read latest readiness report
+GET {{base}}/shipments/{{id}}/readiness-report
+
+### Read audit log
+GET {{base}}/shipments/{{id}}/audit-log
+
+### Approve (rejected with 409 while BLOCKED)
+POST {{base}}/shipments/{{id}}/approve
+x-actor: reviewer@safiri
+
+### Invalid ingestion envelope -> 400 { error }
+POST {{base}}/shipments/{{id}}/documents
+Content-Type: application/json
+
+{ "documentType": "NOT_A_TYPE", "sourceType": "JSON", "payload": {} }

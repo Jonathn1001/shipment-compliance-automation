@@ -37,7 +37,9 @@ export class ShipmentRepository {
   async list() {
     const rows = await this.prisma.shipment.findMany({
       orderBy: { updatedAt: 'desc' },
-      include: { _count: { select: { issues: { where: { status: 'OPEN' } } } } },
+      include: {
+        _count: { select: { issues: { where: { status: 'OPEN' } } } },
+      },
     });
     return rows.map(({ _count, ...shipment }) => ({
       ...shipment,
