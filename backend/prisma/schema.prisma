@@ -33,6 +33,23 @@ enum AuditAction {
   SHIPMENT_APPROVED
 }
 
+/// Kind of trade document an ingestion represents.
+enum DocumentType {
+  COMMERCIAL_INVOICE
+  PACKING_LIST
+  BILL_OF_LADING
+  CERTIFICATE_FORM_E
+  OTHER
+}
+
+/// How the document data reached the system (no real OCR in scope — mock JSON).
+enum SourceType {
+  JSON
+  OCR
+  API
+  CSV
+}
+
 /// Canonical shipment — the single source of truth. Most fields are nullable so a
 /// shipment can be created with partial data and progressively reconciled from
 /// ingested documents; the validation rules flag fields that are required for
@@ -64,10 +81,28 @@ model Shipment {
   updatedAt          DateTime       @updatedAt
 
   auditLogs AuditLog[]
+  documents DocumentIngestion[]
 
   // shipmentReference is intentionally NOT unique — duplicates must be able to
   // persist so the duplicate-shipment-reference validation rule can flag them.
   @@index([shipmentReference])
+}
+
+/// One ingested document attached to a shipment. `rawInput` preserves exactly
+/// what the document contained (for audit); `mappedFields` is the canonical
+/// projection produced by the field mapper. Both are jsonb — the raw payload is
+/// intentionally freeform (no OCR), the mapped shape is the canonical subset.
+model DocumentIngestion {
+  id           String       @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  documentType DocumentType
+  sourceType   SourceType
+  rawInput     Json
+  mappedFields Json
+  createdAt    DateTime     @default(now())
+
+  @@index([shipmentId])
 }
 
 /// Append-only audit trail. Postgres does not auto-index foreign keys, so the

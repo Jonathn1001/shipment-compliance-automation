@@ -17,6 +17,14 @@ export class ShipmentRepository {
     return client.shipment.create({ data });
   }
 
+  update(
+    id: string,
+    data: Prisma.ShipmentUpdateInput,
+    client: PrismaTx = this.prisma,
+  ) {
+    return client.shipment.update({ where: { id }, data });
+  }
+
   findById(id: string) {
     return this.prisma.shipment.findUnique({ where: { id } });
   }

@@ -3,6 +3,7 @@ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from './common/response-envelope.interceptor';
 import { AppConfigModule } from './config/config.module';
+import { DocumentModule } from './document/document.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ShipmentModule } from './shipment/shipment.module';
 
@@ -14,7 +15,7 @@ import { ShipmentModule } from './shipment/shipment.module';
  * DocumentIngestion, Validation and Approval modules alongside ShipmentModule.
  */
 @Module({
-  imports: [AppConfigModule, PrismaModule, ShipmentModule],
+  imports: [AppConfigModule, PrismaModule, ShipmentModule, DocumentModule],
   providers: [
     {
       provide: APP_PIPE,
