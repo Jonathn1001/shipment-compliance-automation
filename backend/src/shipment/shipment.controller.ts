@@ -26,4 +26,9 @@ export class ShipmentController {
   findOne(@Param('id') id: string) {
     return this.shipmentService.findOne(id);
   }
+
+  @Post(':id/approve')
+  approve(@Param('id') id: string, @Headers('x-actor') actor?: string) {
+    return this.shipmentService.approve(id, actor);
+  }
 }

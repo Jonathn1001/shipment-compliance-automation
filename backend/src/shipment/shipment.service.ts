@@ -1,5 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, Prisma } from '../../generated/prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AuditAction,
+  Prisma,
+  ShipmentStatus,
+} from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
@@ -44,6 +52,45 @@ export class ShipmentService {
 
   findAll() {
     return this.repository.list();
+  }
+
+  /**
+   * Approve a shipment to advance it to the next operational stage. Guarded: a
+   * BLOCKED shipment cannot be approved (409) — no status change, no audit entry
+   * — so a non-compliant shipment can never be moved forward by accident. On
+   * success the shipment becomes APPROVED and SHIPMENT_APPROVED + STATUS_CHANGED
+   * are recorded atomically.
+   */
+  async approve(id: string, actor?: string) {
+    const shipment = await this.repository.findById(id);
+    if (!shipment) {
+      throw new NotFoundException(`Shipment ${id} not found`);
+    }
+    if (shipment.currentStatus === ShipmentStatus.BLOCKED) {
+      throw new ConflictException(
+        'A BLOCKED shipment cannot be approved; resolve blocking issues first.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const previousStatus = shipment.currentStatus;
+      const updated = await this.repository.update(
+        id,
+        { currentStatus: ShipmentStatus.APPROVED },
+        tx,
+      );
+      await this.audit.record(AuditAction.SHIPMENT_APPROVED, id, actor, {}, tx);
+      if (previousStatus !== ShipmentStatus.APPROVED) {
+        await this.audit.record(
+          AuditAction.STATUS_CHANGED,
+          id,
+          actor,
+          { oldValue: previousStatus, newValue: ShipmentStatus.APPROVED },
+          tx,
+        );
+      }
+      return updated;
+    });
   }
 
   /** Map the validated DTO onto the Prisma create input (dates coerced). */
