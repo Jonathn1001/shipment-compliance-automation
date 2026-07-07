@@ -80,6 +80,9 @@ describe('Shipments (e2e)', () => {
       .expect(200);
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.data.length).toBeGreaterThan(0);
+    // Each list row carries an OPEN-issue count for the triage screen.
+    expect(res.body.data[0]).toHaveProperty('openIssueCount');
+    expect(typeof res.body.data[0].openIssueCount).toBe('number');
   });
 
   it('returns 404 with an { error } envelope for a missing id', async () => {

@@ -29,8 +29,20 @@ export class ShipmentRepository {
     return this.prisma.shipment.findUnique({ where: { id } });
   }
 
-  list() {
-    return this.prisma.shipment.findMany({ orderBy: { updatedAt: 'desc' } });
+  /**
+   * Shipments for the triage list, newest first, each with a count of its OPEN
+   * validation issues (the list screen's "issue count" column). Uses a filtered
+   * relation `_count` so counting happens in one query, not N+1.
+   */
+  async list() {
+    const rows = await this.prisma.shipment.findMany({
+      orderBy: { updatedAt: 'desc' },
+      include: { _count: { select: { issues: { where: { status: 'OPEN' } } } } },
+    });
+    return rows.map(({ _count, ...shipment }) => ({
+      ...shipment,
+      openIssueCount: _count.issues,
+    }));
   }
 
   /**
