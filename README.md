@@ -116,7 +116,9 @@ cd frontend && npm run dev                            # UI on :5173
 
 Base URL `http://localhost:3000`. Every success is `{ "data": ... }`; every
 error is `{ "error": { statusCode, message, error, path, timestamp } }`. Full
-examples in [`backend/api.http`](backend/api.http).
+examples in [`backend/api.http`](backend/api.http), and interactive OpenAPI docs
+(request/response schemas, try-it-out) at
+[`/api/docs`](http://localhost:3000/api/docs).
 
 | Method | Path                               | Description                          |
 | ------ | ---------------------------------- | ------------------------------------ |
@@ -125,7 +127,7 @@ examples in [`backend/api.http`](backend/api.http).
 | GET    | `/shipments/:id`                   | Get one shipment                     |
 | POST   | `/shipments/:id/documents`         | Ingest a document (mapped + reconciled) |
 | POST   | `/shipments/:id/validate`          | Run validation                       |
-| GET    | `/shipments/:id/issues`            | List validation issues               |
+| GET    | `/shipments/:id/issues`            | List issues (filter with `?severity=CRITICAL`) |
 | GET    | `/shipments/:id/readiness-report`  | Latest readiness report              |
 | GET    | `/shipments/:id/audit-log`         | Audit trail                          |
 | POST   | `/shipments/:id/approve`           | Approve (409 while BLOCKED)          |
