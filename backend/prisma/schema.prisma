@@ -50,6 +50,31 @@ enum SourceType {
   CSV
 }
 
+/// Compliance issue severity. Drives the readiness status resolver:
+/// any CRITICAL → BLOCKED; else any HIGH/MEDIUM → NEEDS_REVIEW; else READY.
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Lifecycle of a validation issue across re-validation runs. OPEN is (re)raised
+/// each run; WAIVED is an accepted risk preserved across runs by (issueType,
+/// field); RESOLVED marks an issue no longer raised since the last run.
+enum IssueStatus {
+  OPEN
+  WAIVED
+  RESOLVED
+}
+
+/// Snapshotted overall assessment on a readiness report.
+enum ReadinessAssessment {
+  READY_TO_PROCEED
+  NEEDS_HUMAN_REVIEW
+  BLOCKED
+}
+
 /// Canonical shipment — the single source of truth. Most fields are nullable so a
 /// shipment can be created with partial data and progressively reconciled from
 /// ingested documents; the validation rules flag fields that are required for
@@ -82,6 +107,8 @@ model Shipment {
 
   auditLogs AuditLog[]
   documents DocumentIngestion[]
+  issues    ValidationIssue[]
+  reports   ReadinessReport[]
 
   // shipmentReference is intentionally NOT unique — duplicates must be able to
   // persist so the duplicate-shipment-reference validation rule can flag them.
@@ -103,6 +130,46 @@ model DocumentIngestion {
   createdAt    DateTime     @default(now())
 
   @@index([shipmentId])
+}
+
+/// A classified compliance issue produced by a validation rule. `issueType` is a
+/// String rule-code (NOT an enum) so the rule set stays open/closed — a new rule
+/// is a new code, no schema change. Reconciled across runs by (issueType, field):
+/// WAIVED survives, absent-since-last-run becomes RESOLVED, new is OPEN.
+model ValidationIssue {
+  id             String      @id @default(cuid())
+  shipmentId     String
+  shipment       Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  issueType      String
+  severity       Severity
+  field          String?
+  explanation    String
+  suggestedAction String
+  status         IssueStatus @default(OPEN)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([shipmentId, status])
+  @@index([shipmentId, issueType, field])
+}
+
+/// Append-only readiness report history. Each validation run appends one row so a
+/// shipment's readiness evolution is retained. Snapshotted fields freeze the
+/// decision at generation time; `nextActions` is the suggested next steps list.
+model ReadinessReport {
+  id                 String              @id @default(cuid())
+  shipmentId         String
+  shipment           Shipment            @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  statusSnapshot     ShipmentStatus
+  overallAssessment  ReadinessAssessment
+  humanReviewRequired Boolean
+  totalIssues        Int
+  criticalCount      Int
+  warningCount       Int
+  nextActions        String[]
+  generatedAt        DateTime            @default(now())
+
+  @@index([shipmentId, generatedAt])
 }
 
 /// Append-only audit trail. Postgres does not auto-index foreign keys, so the

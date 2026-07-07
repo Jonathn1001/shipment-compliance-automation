@@ -6,6 +6,7 @@ import { AppConfigModule } from './config/config.module';
 import { DocumentModule } from './document/document.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ShipmentModule } from './shipment/shipment.module';
+import { ValidationModule } from './validation/validation.module';
 
 /**
  * Root module. Global cross-cutting modules (config, Prisma) plus the shipment
@@ -15,7 +16,13 @@ import { ShipmentModule } from './shipment/shipment.module';
  * DocumentIngestion, Validation and Approval modules alongside ShipmentModule.
  */
 @Module({
-  imports: [AppConfigModule, PrismaModule, ShipmentModule, DocumentModule],
+  imports: [
+    AppConfigModule,
+    PrismaModule,
+    ShipmentModule,
+    DocumentModule,
+    ValidationModule,
+  ],
   providers: [
     {
       provide: APP_PIPE,
