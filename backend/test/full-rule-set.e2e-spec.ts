@@ -163,4 +163,37 @@ describe('Full rule set (e2e)', () => {
     expect(after).toHaveLength(1);
     expect(after[0].status).toBe('WAIVED');
   });
+
+  it('waiving the only issue clears the readiness block (waiver unblocks)', async () => {
+    // Otherwise-clean shipment with a single MEDIUM issue -> NEEDS_REVIEW.
+    const created = await create({
+      ...cleanBody(),
+      countryOfOrigin: undefined,
+    });
+    const id = created.body.data.id;
+
+    const firstRun = await request(app.getHttpServer())
+      .post(`/shipments/${id}/validate`)
+      .expect(201);
+    expect(firstRun.body.data.status).toBe('NEEDS_REVIEW');
+
+    const issue = await prisma.validationIssue.findFirst({
+      where: { shipmentId: id, issueType: 'missing-country-of-origin' },
+    });
+    await prisma.validationIssue.update({
+      where: { id: issue!.id },
+      data: { status: 'WAIVED' },
+    });
+
+    // The accepted risk must no longer drive status or the report.
+    const res = await request(app.getHttpServer())
+      .post(`/shipments/${id}/validate`)
+      .expect(201);
+    expect(res.body.data.status).toBe('READY');
+    expect(res.body.data.report).toMatchObject({
+      overallAssessment: 'READY_TO_PROCEED',
+      totalIssues: 0,
+      humanReviewRequired: false,
+    });
+  });
 });

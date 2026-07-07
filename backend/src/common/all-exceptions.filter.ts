@@ -66,7 +66,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(`${request.method} ${request.url} -> ${statusCode}`);
+      // Log the underlying error (stack/message) so unexpected 5xx are
+      // debuggable server-side. The response body stays the generic envelope;
+      // request bodies and document payloads are never logged.
+      const detail =
+        exception instanceof Error
+          ? (exception.stack ?? exception.message)
+          : String(exception);
+      this.logger.error(
+        `${request.method} ${request.url} -> ${statusCode}`,
+        detail,
+      );
     } else {
       this.logger.warn(`${request.method} ${request.url} -> ${statusCode}`);
     }

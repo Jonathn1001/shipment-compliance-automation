@@ -41,45 +41,53 @@ export class ValidationIssueRepository {
     const existingByKey = new Map(existing.map((i) => [keyOf(i), i]));
     const draftsByKey = new Map(drafts.map((d) => [keyOf(d), d]));
 
-    // Insert or refresh from drafts (WAIVED prior issues are left untouched).
+    const toCreate: IssueDraft[] = [];
+    const toRefresh: { id: string; draft: IssueDraft }[] = [];
     for (const [key, draft] of draftsByKey) {
       const prior = existingByKey.get(key);
-      if (prior?.status === IssueStatus.WAIVED) continue;
-
-      if (prior) {
-        await client.validationIssue.update({
-          where: { id: prior.id },
-          data: {
-            severity: draft.severity,
-            explanation: draft.explanation,
-            suggestedAction: draft.suggestedAction,
-            status: IssueStatus.OPEN,
-          },
-        });
-      } else {
-        await client.validationIssue.create({
-          data: {
-            shipmentId,
-            issueType: draft.issueType,
-            severity: draft.severity,
-            field: draft.field,
-            explanation: draft.explanation,
-            suggestedAction: draft.suggestedAction,
-            status: IssueStatus.OPEN,
-          },
-        });
-      }
+      if (prior?.status === IssueStatus.WAIVED) continue; // accepted risk, untouched
+      if (prior) toRefresh.push({ id: prior.id, draft });
+      else toCreate.push(draft);
     }
 
     // Anything previously OPEN but no longer raised is now RESOLVED (WAIVED kept).
-    for (const [key, prior] of existingByKey) {
-      if (draftsByKey.has(key)) continue;
-      if (prior.status === IssueStatus.OPEN) {
-        await client.validationIssue.update({
-          where: { id: prior.id },
-          data: { status: IssueStatus.RESOLVED },
-        });
-      }
+    const toResolve = existing
+      .filter(
+        (p) => p.status === IssueStatus.OPEN && !draftsByKey.has(keyOf(p)),
+      )
+      .map((p) => p.id);
+
+    // New issues in one insert; resolutions in one update; refreshes carry
+    // per-row data (severity/explanation), so they remain individual updates.
+    if (toCreate.length > 0) {
+      await client.validationIssue.createMany({
+        data: toCreate.map((draft) => ({
+          shipmentId,
+          issueType: draft.issueType,
+          severity: draft.severity,
+          field: draft.field,
+          explanation: draft.explanation,
+          suggestedAction: draft.suggestedAction,
+          status: IssueStatus.OPEN,
+        })),
+      });
+    }
+    if (toResolve.length > 0) {
+      await client.validationIssue.updateMany({
+        where: { id: { in: toResolve } },
+        data: { status: IssueStatus.RESOLVED },
+      });
+    }
+    for (const { id, draft } of toRefresh) {
+      await client.validationIssue.update({
+        where: { id },
+        data: {
+          severity: draft.severity,
+          explanation: draft.explanation,
+          suggestedAction: draft.suggestedAction,
+          status: IssueStatus.OPEN,
+        },
+      });
     }
 
     return client.validationIssue.findMany({

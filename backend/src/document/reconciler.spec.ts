@@ -66,4 +66,14 @@ describe('reconcile (canonical vs document)', () => {
     expect(result.fills).toEqual([]);
     expect(result.conflicts).toEqual([]);
   });
+
+  it('treats a decimal that differs only in formatting as neither fill nor conflict', () => {
+    // canonical Prisma.Decimal stringifies to "12500.5"; a document may send "12500.50".
+    const result = reconcile(
+      { invoiceValue: '12500.5' },
+      { invoiceValue: '12500.50' },
+    );
+    expect(result.fills).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+  });
 });

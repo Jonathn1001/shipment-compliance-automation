@@ -5,13 +5,17 @@ import { createLogger, format, Logger, transports } from 'winston';
  * Winston-backed Nest logger. Console (human-readable, colorized) plus a JSON
  * file transport for a structured trail. Callers pass messages and IDs only —
  * raw ingested document payloads and other sensitive data are never logged.
+ *
+ * This is the bootstrap logger: it is constructed by `main.ts` before the Nest
+ * DI container (and `AppConfigService`) exist, so its level is read from env
+ * directly. `LOG_LEVEL` is declared and validated in the env schema.
  */
 export class MyLogger implements LoggerService {
   private readonly logger: Logger;
 
-  constructor() {
+  constructor(level: string = process.env.LOG_LEVEL ?? 'info') {
     this.logger = createLogger({
-      level: process.env.LOG_LEVEL ?? 'info',
+      level,
       transports: [
         new transports.Console({
           format: format.combine(

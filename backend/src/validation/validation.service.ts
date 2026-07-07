@@ -1,5 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { AuditAction, ShipmentStatus } from '../../generated/prisma/client';
+import {
+  AuditAction,
+  IssueStatus,
+  ShipmentStatus,
+} from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AppConfigService } from '../config/app-config.service';
 import { DocumentService } from '../document/document.service';
@@ -73,7 +77,13 @@ export class ValidationService {
         drafts,
         tx,
       );
-      const resolved = resolveStatus(activeIssues);
+      // Readiness is driven by OPEN issues only. A WAIVED issue is an accepted
+      // risk: it is retained (and returned for display) but must not block the
+      // shipment or count toward the report.
+      const openIssues = activeIssues.filter(
+        (issue) => issue.status === IssueStatus.OPEN,
+      );
+      const resolved = resolveStatus(openIssues);
       const previousStatus = shipment.currentStatus;
       const nextStatus = resolved.status as ShipmentStatus;
 
@@ -106,7 +116,7 @@ export class ValidationService {
       const reportDraft = buildReadinessReport(
         shipmentId,
         resolved,
-        activeIssues,
+        openIssues,
       );
       const report = await this.reports.create(reportDraft, tx);
       await this.audit.record(

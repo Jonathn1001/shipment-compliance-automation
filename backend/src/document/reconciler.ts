@@ -1,4 +1,5 @@
 import { CanonicalFields, CanonicalKey } from './canonical';
+import { valuesEqual } from './canonical-compare';
 
 /** A canonical field that was empty and is being filled from a document. */
 export interface FieldFill {
@@ -45,7 +46,7 @@ export function reconcile(
     const canonicalValue = current[field];
     if (isEmpty(canonicalValue)) {
       fills.push({ field, oldValue: undefined, newValue: documentValue });
-    } else if (String(canonicalValue) !== String(documentValue)) {
+    } else if (!valuesEqual(field, canonicalValue, documentValue)) {
       conflicts.push({ field, canonicalValue, documentValue });
     }
   }

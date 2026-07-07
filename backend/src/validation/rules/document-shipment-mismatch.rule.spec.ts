@@ -1,5 +1,5 @@
 import { Severity } from '../../../generated/prisma/client';
-import { makeContext, makeShipment } from '../test-support';
+import { dec, makeContext, makeShipment } from '../test-support';
 import { DocumentShipmentMismatchRule } from './document-shipment-mismatch.rule';
 
 describe('DocumentShipmentMismatchRule', () => {
@@ -32,6 +32,14 @@ describe('DocumentShipmentMismatchRule', () => {
     const ctx = makeContext({
       shipment: makeShipment({ importer: null }),
       documentValues: { importer: 'Globex Trading' },
+    });
+    expect(rule.evaluate(ctx)).toEqual([]);
+  });
+
+  it('does not flag a decimal that is numerically equal but formatted differently', () => {
+    const ctx = makeContext({
+      shipment: makeShipment({ invoiceValue: dec('12500.50') }),
+      documentValues: { invoiceValue: '12500.5' },
     });
     expect(rule.evaluate(ctx)).toEqual([]);
   });

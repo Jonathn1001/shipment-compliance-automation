@@ -1,12 +1,23 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Max,
   Min,
   validateSync,
 } from 'class-validator';
+
+export const LOG_LEVELS = [
+  'error',
+  'warn',
+  'info',
+  'debug',
+  'verbose',
+] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
 
 /**
  * The full set of environment variables the application depends on. This is the
@@ -22,6 +33,13 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(65535)
   PORT: number = 3000;
+
+  // Consumed by the bootstrap logger (MyLogger), which is constructed before the
+  // DI container exists and so reads it from env directly. Declared here so the
+  // variable is known and validated rather than an ad-hoc read.
+  @IsOptional()
+  @IsIn(LOG_LEVELS)
+  LOG_LEVEL: LogLevel = 'info';
 
   @IsInt()
   @Min(0)

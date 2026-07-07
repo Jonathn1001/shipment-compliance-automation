@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Severity } from '../../../generated/prisma/client';
 import { CanonicalKey } from '../../document/canonical';
+import { valuesEqual } from '../../document/canonical-compare';
 import {
   IssueDraft,
   ValidationContext,
@@ -26,7 +27,7 @@ export class DocumentShipmentMismatchRule implements ValidationRule {
         const documentValue = ctx.documentValues[field];
         const canonicalValue = shipmentCanonical[field];
         if (isEmpty(documentValue) || isEmpty(canonicalValue)) return [];
-        if (String(canonicalValue) === String(documentValue)) return [];
+        if (valuesEqual(field, canonicalValue, documentValue)) return [];
 
         return [
           {
