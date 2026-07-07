@@ -1,0 +1,85 @@
+// Shipment Compliance Automation — Prisma schema
+// Postgres is the source of truth. Native enums + jsonb + Decimal.
+// Issue 01 (walking skeleton) introduces Shipment + AuditLog. Later slices add
+// DocumentIngestion, ValidationIssue, ReadinessReport and their relations.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Readiness lifecycle: CREATED → READY | NEEDS_REVIEW | BLOCKED → APPROVED.
+enum ShipmentStatus {
+  CREATED
+  READY
+  NEEDS_REVIEW
+  BLOCKED
+  APPROVED
+}
+
+/// Every state-changing operation appends one AuditLog row tagged with an action.
+enum AuditAction {
+  SHIPMENT_CREATED
+  DOCUMENT_INGESTED
+  FIELD_UPDATED
+  VALIDATION_RUN
+  REPORT_GENERATED
+  STATUS_CHANGED
+  SHIPMENT_APPROVED
+}
+
+/// Canonical shipment — the single source of truth. Most fields are nullable so a
+/// shipment can be created with partial data and progressively reconciled from
+/// ingested documents; the validation rules flag fields that are required for
+/// readiness but still missing.
+model Shipment {
+  id                 String         @id @default(cuid())
+  shipmentReference  String
+  exporter           String?
+  importer           String?
+  importerId         String?
+  invoiceNumber      String?
+  invoiceValue       Decimal?       @db.Decimal(18, 2)
+  currency           String?
+  goodsDescription   String?
+  hsCode             String?
+  countryOfOrigin    String?
+  grossWeightKg      Decimal?       @db.Decimal(12, 3)
+  netWeightKg        Decimal?       @db.Decimal(12, 3)
+  numberOfPackages   Int?
+  containerNumber    String?
+  billOfLadingNumber String?
+  packagingType      String?
+  ispm15Certified    Boolean?
+  eformCertificate   String?
+  freightMode        String?
+  arrivalDate        DateTime?
+  currentStatus      ShipmentStatus @default(CREATED)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  auditLogs AuditLog[]
+
+  // shipmentReference is intentionally NOT unique — duplicates must be able to
+  // persist so the duplicate-shipment-reference validation rule can flag them.
+  @@index([shipmentReference])
+}
+
+/// Append-only audit trail. Postgres does not auto-index foreign keys, so the
+/// read path (by shipment, newest first) is indexed explicitly.
+model AuditLog {
+  id         String      @id @default(cuid())
+  shipmentId String
+  shipment   Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  timestamp  DateTime    @default(now())
+  action     AuditAction
+  actor      String      @default("system")
+  details    Json?
+
+  @@index([shipmentId, timestamp])
+}

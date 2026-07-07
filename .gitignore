@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+coverage/
+
+# Prisma generated client (regenerated via `prisma generate`)
+backend/generated/
+
+# env / secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# local test/runtime scaffolding (embedded Postgres, staged libs, logs)
+backend/.locallib/
+backend/.pg-data/
+**/pgdata-*/
+logs/
+*.log
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
