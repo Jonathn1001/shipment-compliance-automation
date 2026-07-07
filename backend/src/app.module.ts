@@ -2,6 +2,7 @@ import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from './common/response-envelope.interceptor';
+import { validationExceptionFactory } from './common/validation-exception.factory';
 import { AppConfigModule } from './config/config.module';
 import { DocumentModule } from './document/document.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,6 +31,9 @@ import { ValidationModule } from './validation/validation.module';
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
+        // Input-validation failures become 422 + VALIDATION_ERROR with per-field
+        // details, instead of the default 400 BadRequestException.
+        exceptionFactory: validationExceptionFactory,
       }),
     },
     { provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor },

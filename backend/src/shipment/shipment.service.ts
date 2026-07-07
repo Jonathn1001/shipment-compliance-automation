@@ -1,13 +1,11 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   AuditAction,
   Prisma,
   ShipmentStatus,
 } from '../../generated/prisma/client';
+import { AppException } from '../common/app.exception';
+import { ErrorCode } from '../common/error-code';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
@@ -45,7 +43,7 @@ export class ShipmentService {
   async findOne(id: string) {
     const shipment = await this.repository.findById(id);
     if (!shipment) {
-      throw new NotFoundException(`Shipment ${id} not found`);
+      throw new AppException(ErrorCode.SHIPMENT_NOT_FOUND);
     }
     return shipment;
   }
@@ -64,12 +62,10 @@ export class ShipmentService {
   async approve(id: string, actor?: string) {
     const shipment = await this.repository.findById(id);
     if (!shipment) {
-      throw new NotFoundException(`Shipment ${id} not found`);
+      throw new AppException(ErrorCode.SHIPMENT_NOT_FOUND);
     }
     if (shipment.currentStatus === ShipmentStatus.BLOCKED) {
-      throw new ConflictException(
-        'A BLOCKED shipment cannot be approved; resolve blocking issues first.',
-      );
+      throw new AppException(ErrorCode.SHIPMENT_BLOCKED);
     }
 
     return this.prisma.$transaction(async (tx) => {

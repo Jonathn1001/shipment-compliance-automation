@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditAction, Prisma, Shipment } from '../../generated/prisma/client';
+import { AppException } from '../common/app.exception';
+import { ErrorCode } from '../common/error-code';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShipmentRepository } from '../shipment/shipment.repository';
@@ -31,7 +33,7 @@ export class DocumentService {
   async ingest(shipmentId: string, dto: IngestDocumentDto, actor?: string) {
     const shipment = await this.shipments.findById(shipmentId);
     if (!shipment) {
-      throw new NotFoundException(`Shipment ${shipmentId} not found`);
+      throw new AppException(ErrorCode.SHIPMENT_NOT_FOUND);
     }
 
     const mapped = mapDocument(dto.payload, dto.documentType);

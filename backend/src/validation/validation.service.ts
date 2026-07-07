@@ -1,10 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   AuditAction,
   IssueStatus,
   Severity,
   ShipmentStatus,
 } from '../../generated/prisma/client';
+import { AppException } from '../common/app.exception';
+import { ErrorCode } from '../common/error-code';
 import { AuditService } from '../audit/audit.service';
 import { AppConfigService } from '../config/app-config.service';
 import { DocumentService } from '../document/document.service';
@@ -46,7 +48,7 @@ export class ValidationService {
   async run(shipmentId: string, actor?: string) {
     const shipment = await this.shipments.findById(shipmentId);
     if (!shipment) {
-      throw new NotFoundException(`Shipment ${shipmentId} not found`);
+      throw new AppException(ErrorCode.SHIPMENT_NOT_FOUND);
     }
 
     const sameReference = await this.shipments.findByReference(

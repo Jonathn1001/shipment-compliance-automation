@@ -115,9 +115,9 @@ cd frontend && npm run dev                            # UI on :5173
 ## API
 
 Base URL `http://localhost:3000`. Every success is `{ "data": ... }`; every
-error is `{ "error": { statusCode, message, error, path, timestamp } }`. Full
-examples in [`backend/api.http`](backend/api.http), and interactive OpenAPI docs
-(request/response schemas, try-it-out) at
+error is `{ "error": { statusCode, code, message, error, details?, path, timestamp } }`.
+Full examples in [`backend/api.http`](backend/api.http), and interactive OpenAPI
+docs (request/response schemas, try-it-out) at
 [`/api/docs`](http://localhost:3000/api/docs).
 
 | Method | Path                               | Description                          |
@@ -140,6 +140,31 @@ curl -X POST http://localhost:3000/shipments \
 
 Pass `x-actor: <name>` on state-changing requests to attribute the action in the
 audit trail (defaults to `system`).
+
+### Error codes
+
+Every error carries a **stable, catalogued `code`** — the machine-readable
+contract a client branches on. The human `message` beside it may change without
+breaking callers. Codes are namespaced `SCA-<AREA>-<NNN>` and defined in one
+place ([`backend/src/common/error-code.ts`](backend/src/common/error-code.ts)).
+
+| Code | HTTP | Meaning |
+| ---- | ---- | ------- |
+| `SCA-SHIP-001` | 404 | Shipment not found |
+| `SCA-SHIP-002` | 409 | A BLOCKED shipment cannot be approved |
+| `SCA-VAL-001`  | 422 | Request validation failed — offending fields under `error.details` |
+| `SCA-GEN-001`  | 4xx | Generic client error not raised deliberately (e.g. unmatched route) |
+| `SCA-INT-001`  | 500 | Uncategorised server fault (raw cause logged server-side, never returned) |
+
+Input validation returns **422** with per-field detail, so the client reads
+structured errors rather than parsing prose:
+
+```json
+{ "error": { "statusCode": 422, "code": "SCA-VAL-001",
+  "message": "Request validation failed.",
+  "details": [{ "field": "shipmentReference",
+                "messages": ["shipmentReference should not be empty"] }] } }
+```
 
 ## Testing
 

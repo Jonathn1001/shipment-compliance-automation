@@ -61,7 +61,10 @@ describe('Approval (e2e)', () => {
       .post(`/shipments/${id}/approve`)
       .expect(409);
     expect(res.body).toHaveProperty('error');
-    expect(res.body.error).toMatchObject({ statusCode: 409 });
+    expect(res.body.error).toMatchObject({
+      statusCode: 409,
+      code: 'SCA-SHIP-002',
+    });
 
     // Unchanged: still BLOCKED, no SHIPMENT_APPROVED recorded.
     const shipment = await request(app.getHttpServer())

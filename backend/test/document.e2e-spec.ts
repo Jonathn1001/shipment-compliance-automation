@@ -126,7 +126,7 @@ describe('Document ingestion (e2e)', () => {
     expect(actions).toContain('FIELD_UPDATED');
   });
 
-  it('rejects a bad ingestion envelope with 400 { error }', async () => {
+  it('rejects a bad ingestion envelope with 422 { error }', async () => {
     const created = await createShipment({ shipmentReference: 'SAF-ING-4' });
     const id = created.body.data.id;
 
@@ -137,10 +137,13 @@ describe('Document ingestion (e2e)', () => {
         sourceType: 'JSON',
         payload: {},
       })
-      .expect(400);
+      .expect(422);
 
     expect(res.body).toHaveProperty('error');
-    expect(res.body.error).toMatchObject({ statusCode: 400 });
+    expect(res.body.error).toMatchObject({
+      statusCode: 422,
+      code: 'SCA-VAL-001',
+    });
   });
 
   it('returns 404 { error } when ingesting into a missing shipment', async () => {
@@ -153,6 +156,9 @@ describe('Document ingestion (e2e)', () => {
       })
       .expect(404);
 
-    expect(res.body.error).toMatchObject({ statusCode: 404 });
+    expect(res.body.error).toMatchObject({
+      statusCode: 404,
+      code: 'SCA-SHIP-001',
+    });
   });
 });

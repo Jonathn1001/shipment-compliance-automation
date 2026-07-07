@@ -91,17 +91,23 @@ describe('Shipments (e2e)', () => {
       .expect(404);
 
     expect(res.body).toHaveProperty('error');
-    expect(res.body.error).toMatchObject({ statusCode: 404 });
+    expect(res.body.error).toMatchObject({
+      statusCode: 404,
+      code: 'SCA-SHIP-001',
+    });
     expect(res.body).not.toHaveProperty('data');
   });
 
-  it('rejects an invalid body with a 400 { error } envelope', async () => {
+  it('rejects an invalid body with a 422 { error } envelope', async () => {
     const res = await request(app.getHttpServer())
       .post('/shipments')
       .send({ importer: 'no reference supplied' })
-      .expect(400);
+      .expect(422);
 
     expect(res.body).toHaveProperty('error');
-    expect(res.body.error).toMatchObject({ statusCode: 400 });
+    expect(res.body.error).toMatchObject({
+      statusCode: 422,
+      code: 'SCA-VAL-001',
+    });
   });
 });

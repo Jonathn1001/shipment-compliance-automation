@@ -204,7 +204,7 @@ describe('Full rule set (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/shipments/${id}/issues`)
       .query({ severity: 'URGENT' })
-      .expect(400);
+      .expect(422);
   });
 
   it('waiving the only issue clears the readiness block (waiver unblocks)', async () => {
