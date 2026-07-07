@@ -44,6 +44,7 @@ export function makeContext(
   return {
     shipment: over.shipment ?? makeShipment(),
     otherShipmentsWithSameReference: over.otherShipmentsWithSameReference ?? 0,
+    documentValues: over.documentValues ?? {},
     thresholds: over.thresholds ?? {
       reviewWindowDays: 30,
       weightTolerancePct: 5,

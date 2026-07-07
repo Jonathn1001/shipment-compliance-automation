@@ -1,4 +1,5 @@
 import { Severity, Shipment } from '../../generated/prisma/client';
+import { CanonicalFields } from '../document/canonical';
 
 /**
  * A rule's finding before persistence. `issueType` is a stable String rule-code
@@ -21,7 +22,15 @@ export interface IssueDraft {
  */
 export interface ValidationContext {
   shipment: Shipment;
+  /** Count of OTHER persisted shipments sharing this reference (duplicate rule). */
   otherShipmentsWithSameReference: number;
+  /**
+   * The union of canonical fields seen across this shipment's ingested documents.
+   * Used by the document-vs-shipment mismatch rule to compare what a document
+   * asserted against the canonical record (a document value that differs from a
+   * set canonical value is a mismatch, not a fill — see the reconciler).
+   */
+  documentValues: CanonicalFields;
   thresholds: {
     reviewWindowDays: number;
     weightTolerancePct: number;

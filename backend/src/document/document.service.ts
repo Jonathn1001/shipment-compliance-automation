@@ -98,6 +98,29 @@ export class DocumentService {
   listForShipment(shipmentId: string) {
     return this.documents.findByShipment(shipmentId);
   }
+
+  /**
+   * The union of canonical values across a shipment's ingested documents (oldest
+   * first, first-non-empty wins). Used by the validation engine to feed the
+   * document-vs-shipment mismatch rule.
+   */
+  async mergedDocumentValues(shipmentId: string): Promise<CanonicalFields> {
+    const docs = await this.documents.findByShipment(shipmentId);
+    const merged: CanonicalFields = {};
+    for (const doc of [...docs].reverse()) {
+      const mapped = doc.mappedFields as CanonicalFields;
+      for (const [key, value] of Object.entries(mapped)) {
+        if (
+          value !== null &&
+          value !== undefined &&
+          merged[key as keyof CanonicalFields] === undefined
+        ) {
+          (merged[key as keyof CanonicalFields] as unknown) = value;
+        }
+      }
+    }
+    return merged;
+  }
 }
 
 /** Project a persisted shipment into the plain canonical shape the reconciler expects. */

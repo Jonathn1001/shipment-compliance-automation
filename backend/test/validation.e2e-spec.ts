@@ -17,6 +17,22 @@ describe('Validation engine (e2e)', () => {
   const create = (body: Record<string, unknown>) =>
     request(app.getHttpServer()).post('/shipments').send(body).expect(201);
 
+  // An otherwise-clean shipment (passes every other rule) so a test can isolate a
+  // single issue — the gross<net weights — without other rules changing the status.
+  let counter = 0;
+  const cleanBase = () => ({
+    shipmentReference: `SAF-VAL-${Date.now()}-${counter++}`,
+    exporter: 'Shenzhen Widgets Co',
+    importer: 'Acme Importers Ltd',
+    hsCode: '8471.30',
+    goodsDescription: 'Laptop computers',
+    countryOfOrigin: 'DE',
+    billOfLadingNumber: 'BL-88231',
+    invoiceValue: 1000,
+    containerNumber: 'CSQU3054383',
+    packagingType: 'Plastic',
+  });
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -32,7 +48,7 @@ describe('Validation engine (e2e)', () => {
 
   it('gross < net -> validate -> BLOCKED with a CRITICAL issue and a report', async () => {
     const created = await create({
-      shipmentReference: 'SAF-VAL-1',
+      ...cleanBase(),
       grossWeightKg: 900,
       netWeightKg: 1000,
     });
@@ -103,7 +119,7 @@ describe('Validation engine (e2e)', () => {
 
   it('re-validating after a fix resolves the issue and returns to READY', async () => {
     const created = await create({
-      shipmentReference: 'SAF-VAL-3',
+      ...cleanBase(),
       grossWeightKg: 900,
       netWeightKg: 1000,
     });

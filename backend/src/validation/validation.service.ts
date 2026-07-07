@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditAction, ShipmentStatus } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { AppConfigService } from '../config/app-config.service';
+import { DocumentService } from '../document/document.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ShipmentRepository } from '../shipment/shipment.repository';
 import { ReadinessReportRepository } from './readiness-report.repository';
@@ -24,6 +26,8 @@ export class ValidationService {
     private readonly issues: ValidationIssueRepository,
     private readonly reports: ReadinessReportRepository,
     private readonly audit: AuditService,
+    private readonly config: AppConfigService,
+    private readonly documents: DocumentService,
     @Inject(VALIDATION_RULES) private readonly rules: ValidationRule[],
   ) {}
 
@@ -40,10 +44,22 @@ export class ValidationService {
       throw new NotFoundException(`Shipment ${shipmentId} not found`);
     }
 
+    const sameReference = await this.shipments.findByReference(
+      shipment.shipmentReference,
+    );
+    const documentValues =
+      await this.documents.mergedDocumentValues(shipmentId);
+
     const ctx: ValidationContext = {
       shipment,
-      otherShipmentsWithSameReference: 0,
-      thresholds: { reviewWindowDays: 30, weightTolerancePct: 5 },
+      otherShipmentsWithSameReference: sameReference.filter(
+        (s) => s.id !== shipment.id,
+      ).length,
+      documentValues,
+      thresholds: {
+        reviewWindowDays: this.config.reviewWindowDays,
+        weightTolerancePct: this.config.weightTolerancePct,
+      },
       now: new Date(),
     };
 
