@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { IssueStatus, ValidationIssue } from '../../generated/prisma/client';
+import {
+  IssueStatus,
+  Severity,
+  ValidationIssue,
+} from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../prisma/prisma-tx';
 import { IssueDraft } from './validation.types';
@@ -12,9 +16,9 @@ const keyOf = (i: { issueType: string; field: string | null }): string =>
 export class ValidationIssueRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByShipment(shipmentId: string) {
+  findByShipment(shipmentId: string, severity?: Severity) {
     return this.prisma.validationIssue.findMany({
-      where: { shipmentId },
+      where: { shipmentId, ...(severity ? { severity } : {}) },
       orderBy: [{ severity: 'desc' }, { issueType: 'asc' }],
     });
   }

@@ -1,11 +1,15 @@
-import { Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Severity } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { ListIssuesQueryDto } from './dto/list-issues-query.dto';
 import { ValidationService } from './validation.service';
 
 /**
  * Validation + read surface for a shipment. `x-actor` records the human actor in
  * the audit trail (defaults to "system").
  */
+@ApiTags('Validation')
 @Controller('shipments/:id')
 export class ValidationController {
   constructor(
@@ -19,8 +23,14 @@ export class ValidationController {
   }
 
   @Get('issues')
-  issues(@Param('id') id: string) {
-    return this.validation.listIssues(id);
+  @ApiQuery({
+    name: 'severity',
+    enum: Severity,
+    required: false,
+    description: 'Return only issues of this severity.',
+  })
+  issues(@Param('id') id: string, @Query() query: ListIssuesQueryDto) {
+    return this.validation.listIssues(id, query.severity);
   }
 
   @Get('readiness-report')

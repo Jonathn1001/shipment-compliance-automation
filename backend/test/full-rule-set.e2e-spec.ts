@@ -164,6 +164,49 @@ describe('Full rule set (e2e)', () => {
     expect(after[0].status).toBe('WAIVED');
   });
 
+  it('filters issues by severity via ?severity= and rejects an unknown value', async () => {
+    // A shipment that raises issues of >=2 severities: wood crate w/o ISPM15
+    // (CRITICAL) plus a missing country of origin (non-critical).
+    const created = await create({
+      ...cleanBody(),
+      countryOfOrigin: undefined,
+      packagingType: 'Wooden crate',
+      ispm15Certified: false,
+    });
+    const id = created.body.data.id;
+
+    await request(app.getHttpServer())
+      .post(`/shipments/${id}/validate`)
+      .expect(201);
+
+    const all = await request(app.getHttpServer())
+      .get(`/shipments/${id}/issues`)
+      .expect(200);
+    const severities = new Set(
+      all.body.data.map((i: { severity: string }) => i.severity),
+    );
+    expect(severities.has('CRITICAL')).toBe(true);
+    expect(severities.size).toBeGreaterThan(1); // at least one non-critical too
+
+    const critical = await request(app.getHttpServer())
+      .get(`/shipments/${id}/issues`)
+      .query({ severity: 'CRITICAL' })
+      .expect(200);
+    expect(critical.body.data.length).toBeGreaterThan(0);
+    expect(critical.body.data.length).toBeLessThan(all.body.data.length);
+    expect(
+      critical.body.data.every(
+        (i: { severity: string }) => i.severity === 'CRITICAL',
+      ),
+    ).toBe(true);
+
+    // An unknown severity is rejected by validation, not silently ignored.
+    await request(app.getHttpServer())
+      .get(`/shipments/${id}/issues`)
+      .query({ severity: 'URGENT' })
+      .expect(400);
+  });
+
   it('waiving the only issue clears the readiness block (waiver unblocks)', async () => {
     // Otherwise-clean shipment with a single MEDIUM issue -> NEEDS_REVIEW.
     const created = await create({

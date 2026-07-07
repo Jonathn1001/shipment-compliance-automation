@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ShipmentService } from './shipment.service';
 
@@ -8,6 +9,7 @@ import { ShipmentService } from './shipment.service';
  * exception filter apply the `{ data } | { error }` envelope. `x-actor` lets a
  * human actor be recorded in the audit trail (defaults to "system").
  */
+@ApiTags('Shipments')
 @Controller('shipments')
 export class ShipmentController {
   constructor(private readonly shipmentService: ShipmentService) {}

@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AuditAction,
   IssueStatus,
+  Severity,
   ShipmentStatus,
 } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -131,8 +132,8 @@ export class ValidationService {
     });
   }
 
-  listIssues(shipmentId: string) {
-    return this.issues.findByShipment(shipmentId);
+  listIssues(shipmentId: string, severity?: Severity) {
+    return this.issues.findByShipment(shipmentId, severity);
   }
 
   latestReport(shipmentId: string) {
