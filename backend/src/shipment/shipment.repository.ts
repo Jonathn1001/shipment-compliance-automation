@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma/client';
+import { Prisma, Severity, ShipmentStatus } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../prisma/prisma-tx';
 
@@ -53,5 +53,35 @@ export class ShipmentRepository {
    */
   findByReference(shipmentReference: string) {
     return this.prisma.shipment.findMany({ where: { shipmentReference } });
+  }
+
+  // --- Dashboard aggregates (GET /shipments/stats) ---
+
+  /** Count of shipments grouped by their current lifecycle status. */
+  async countByStatus(): Promise<Map<ShipmentStatus, number>> {
+    const rows = await this.prisma.shipment.groupBy({
+      by: ['currentStatus'],
+      _count: true,
+    });
+    return new Map(rows.map((r) => [r.currentStatus, r._count]));
+  }
+
+  /** Count of OPEN validation issues grouped by severity. */
+  async countOpenIssuesBySeverity(): Promise<Map<Severity, number>> {
+    const rows = await this.prisma.validationIssue.groupBy({
+      by: ['severity'],
+      where: { status: 'OPEN' },
+      _count: true,
+    });
+    return new Map(rows.map((r) => [r.severity, r._count]));
+  }
+
+  /** Creation timestamps of shipments created on/after `since` (for the trend). */
+  async createdAtsSince(since: Date): Promise<Date[]> {
+    const rows = await this.prisma.shipment.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true },
+    });
+    return rows.map((r) => r.createdAt);
   }
 }

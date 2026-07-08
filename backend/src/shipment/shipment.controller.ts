@@ -24,6 +24,12 @@ export class ShipmentController {
     return this.shipmentService.findAll();
   }
 
+  // Declared before `:id` so the literal path is not captured as an id.
+  @Get('stats')
+  stats() {
+    return this.shipmentService.stats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.shipmentService.findOne(id);

@@ -1,9 +1,11 @@
 import type {
   AuditLog,
   DocumentIngestion,
+  IngestDocumentInput,
   ReadinessReport,
   Shipment,
   ShipmentListRow,
+  ShipmentStats,
   ValidationIssue,
   ValidationRunResult,
 } from './types';
@@ -48,8 +50,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listShipments: () => request<ShipmentListRow[]>('/shipments'),
+  getStats: () => request<ShipmentStats>('/shipments/stats'),
   getShipment: (id: string) => request<Shipment>(`/shipments/${id}`),
   getDocuments: (id: string) => request<DocumentIngestion[]>(`/shipments/${id}/documents`),
+  ingestDocument: (id: string, input: IngestDocumentInput) =>
+    request<DocumentIngestion>(`/shipments/${id}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   getIssues: (id: string) => request<ValidationIssue[]>(`/shipments/${id}/issues`),
   getReadinessReport: (id: string) =>
     request<ReadinessReport | null>(`/shipments/${id}/readiness-report`),

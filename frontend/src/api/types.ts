@@ -5,6 +5,21 @@ export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type IssueStatus = 'OPEN' | 'WAIVED' | 'RESOLVED';
 export type ReadinessAssessment = 'READY_TO_PROCEED' | 'NEEDS_HUMAN_REVIEW' | 'BLOCKED';
 
+export type DocumentType =
+  | 'COMMERCIAL_INVOICE'
+  | 'PACKING_LIST'
+  | 'BILL_OF_LADING'
+  | 'CERTIFICATE_FORM_E'
+  | 'OTHER';
+export type SourceType = 'JSON' | 'OCR' | 'API' | 'CSV';
+
+/** Body for `POST /shipments/:id/documents`. `payload` is freeform mock data. */
+export interface IngestDocumentInput {
+  documentType: DocumentType;
+  sourceType: SourceType;
+  payload: Record<string, unknown>;
+}
+
 export interface Shipment {
   id: string;
   shipmentReference: string;
@@ -34,6 +49,21 @@ export interface Shipment {
 
 export interface ShipmentListRow extends Shipment {
   openIssueCount: number;
+}
+
+/** One month bucket of the dashboard shipments-over-time trend. */
+export interface MonthlyPoint {
+  month: string;
+  label: string;
+  count: number;
+}
+
+/** Aggregate for the dashboard (`GET /shipments/stats`). Every enum key present. */
+export interface ShipmentStats {
+  total: number;
+  byStatus: Record<ShipmentStatus, number>;
+  openIssuesBySeverity: Record<Severity, number>;
+  shipmentsOverTime: MonthlyPoint[];
 }
 
 export interface DocumentIngestion {
@@ -81,8 +111,16 @@ export interface AuditLog {
   details: Record<string, unknown> | null;
 }
 
+/** One phase of a validation run, as reported by the engine (`/validate`). */
+export interface ValidationStep {
+  key: 'context' | 'rules' | 'reconcile' | 'status' | 'report';
+  label: string;
+  detail: Record<string, string | number | boolean>;
+}
+
 export interface ValidationRunResult {
   status: ShipmentStatus;
   issues: ValidationIssue[];
   report: ReadinessReport;
+  trace: ValidationStep[];
 }

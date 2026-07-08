@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   AuditAction,
   Prisma,
+  Severity,
   ShipmentStatus,
 } from '../../generated/prisma/client';
 import { AppException } from '../common/app.exception';
@@ -10,6 +11,15 @@ import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ShipmentRepository } from './shipment.repository';
+import {
+  buildMonthlySeries,
+  ShipmentStats,
+  tally,
+  windowStart,
+} from './shipment-stats';
+
+/** How many trailing months the dashboard trend covers. */
+const TREND_MONTHS = 6;
 
 @Injectable()
 export class ShipmentService {
@@ -50,6 +60,33 @@ export class ShipmentService {
 
   findAll() {
     return this.repository.list();
+  }
+
+  /**
+   * Aggregate counts for the dashboard: shipments by status, OPEN issues by
+   * severity, and a zero-filled shipments-over-time trend. Every enum key is
+   * present (0 when unseen) so the client never has to special-case gaps.
+   */
+  async stats(now: Date = new Date()): Promise<ShipmentStats> {
+    const [byStatusRaw, bySeverityRaw, createdAts] = await Promise.all([
+      this.repository.countByStatus(),
+      this.repository.countOpenIssuesBySeverity(),
+      this.repository.createdAtsSince(windowStart(now, TREND_MONTHS)),
+    ]);
+
+    const byStatus = tally(
+      Object.values(ShipmentStatus) as ShipmentStatus[],
+      byStatusRaw,
+    );
+    return {
+      total: Object.values(byStatus).reduce((a, b) => a + b, 0),
+      byStatus,
+      openIssuesBySeverity: tally(
+        Object.values(Severity) as Severity[],
+        bySeverityRaw,
+      ),
+      shipmentsOverTime: buildMonthlySeries(createdAts, now, TREND_MONTHS),
+    };
   }
 
   /**
