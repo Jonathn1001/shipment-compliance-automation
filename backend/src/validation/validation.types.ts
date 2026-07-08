@@ -50,3 +50,14 @@ export interface ValidationRule {
 
 /** DI token for the multi-provider array of validation rules. */
 export const VALIDATION_RULES = Symbol('VALIDATION_RULES');
+
+/**
+ * One observable phase of a validation run, surfaced in the `/validate` response
+ * so the UI can show the pipeline step by step. `detail` carries the real numbers
+ * the engine computed for that phase (not a reconstruction).
+ */
+export interface ValidationStep {
+  key: 'context' | 'rules' | 'reconcile' | 'status' | 'report';
+  label: string;
+  detail: Record<string, string | number | boolean>;
+}

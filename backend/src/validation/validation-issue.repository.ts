@@ -12,6 +12,20 @@ import { IssueDraft } from './validation.types';
 const keyOf = (i: { issueType: string; field: string | null }): string =>
   `${i.issueType}::${i.field ?? ''}`;
 
+/** How the reconcile transformed the issue set — surfaced in the pipeline trace. */
+export interface ReconcileCounts {
+  created: number;
+  refreshed: number;
+  resolved: number;
+  waivedKept: number;
+}
+
+export interface ReconcileResult {
+  /** Active issues after reconcile (OPEN + WAIVED). */
+  issues: ValidationIssue[];
+  counts: ReconcileCounts;
+}
+
 @Injectable()
 export class ValidationIssueRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -38,7 +52,7 @@ export class ValidationIssueRepository {
     shipmentId: string,
     drafts: IssueDraft[],
     client: PrismaTx,
-  ): Promise<ValidationIssue[]> {
+  ): Promise<ReconcileResult> {
     const existing = await client.validationIssue.findMany({
       where: { shipmentId },
     });
@@ -94,12 +108,23 @@ export class ValidationIssueRepository {
       });
     }
 
-    return client.validationIssue.findMany({
+    const issues = await client.validationIssue.findMany({
       where: {
         shipmentId,
         status: { in: [IssueStatus.OPEN, IssueStatus.WAIVED] },
       },
       orderBy: [{ severity: 'desc' }, { issueType: 'asc' }],
     });
+
+    return {
+      issues,
+      counts: {
+        created: toCreate.length,
+        refreshed: toRefresh.length,
+        resolved: toResolve.length,
+        waivedKept: existing.filter((p) => p.status === IssueStatus.WAIVED)
+          .length,
+      },
+    };
   }
 }

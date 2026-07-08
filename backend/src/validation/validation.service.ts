@@ -20,6 +20,7 @@ import {
   IssueDraft,
   ValidationContext,
   ValidationRule,
+  ValidationStep,
   VALIDATION_RULES,
 } from './validation.types';
 
@@ -75,11 +76,8 @@ export class ValidationService {
     );
 
     return this.prisma.$transaction(async (tx) => {
-      const activeIssues = await this.issues.replaceAndReconcile(
-        shipmentId,
-        drafts,
-        tx,
-      );
+      const { issues: activeIssues, counts } =
+        await this.issues.replaceAndReconcile(shipmentId, drafts, tx);
       // Readiness is driven by OPEN issues only. A WAIVED issue is an accepted
       // risk: it is retained (and returned for display) but must not block the
       // shipment or count toward the report.
@@ -97,6 +95,8 @@ export class ValidationService {
         asJson({
           ruleCount: this.rules.length,
           issueCount: activeIssues.length,
+          created: counts.created,
+          resolved: counts.resolved,
         }),
         tx,
       );
@@ -130,7 +130,57 @@ export class ValidationService {
         tx,
       );
 
-      return { status: nextStatus, issues: activeIssues, report };
+      // A faithful trace of what each phase actually did — the same numbers the
+      // engine computed above, surfaced so the UI can replay the run step by step.
+      const trace: ValidationStep[] = [
+        {
+          key: 'context',
+          label: 'Load context',
+          detail: {
+            documentFields: Object.keys(documentValues).length,
+            sameReference: ctx.otherShipmentsWithSameReference,
+            reviewWindowDays: ctx.thresholds.reviewWindowDays,
+            weightTolerancePct: ctx.thresholds.weightTolerancePct,
+          },
+        },
+        {
+          key: 'rules',
+          label: 'Run rules',
+          detail: { rulesRun: this.rules.length, drafts: drafts.length },
+        },
+        {
+          key: 'reconcile',
+          label: 'Reconcile issues',
+          detail: {
+            open: openIssues.length,
+            created: counts.created,
+            refreshed: counts.refreshed,
+            resolved: counts.resolved,
+            waivedKept: counts.waivedKept,
+          },
+        },
+        {
+          key: 'status',
+          label: 'Resolve status',
+          detail: {
+            from: previousStatus,
+            to: nextStatus,
+            humanReview: resolved.humanReviewRequired,
+          },
+        },
+        {
+          key: 'report',
+          label: 'Build report',
+          detail: {
+            assessment: report.overallAssessment,
+            total: report.totalIssues,
+            critical: report.criticalCount,
+            warnings: report.warningCount,
+          },
+        },
+      ];
+
+      return { status: nextStatus, issues: activeIssues, report, trace };
     });
   }
 
