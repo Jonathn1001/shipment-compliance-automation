@@ -1,10 +1,11 @@
 # Shipment Compliance Automation
 
-A backend service (with a thin read-only frontend) that automates the compliance
-review of shipment documents: ingest document data into a canonical shipment
-record, run a set of compliance rules, derive a **readiness** decision and report,
-and keep a complete **audit trail** — turning an ad-hoc manual check into a
-consistent, explainable, auditable workflow.
+A backend service (with a React frontend — dashboard, document upload, and a
+step-by-step validation pipeline) that automates the compliance review of shipment
+documents: ingest document data into a canonical shipment record, run a set of
+compliance rules, derive a **readiness** decision and report, and keep a complete
+**audit trail** — turning an ad-hoc manual check into a consistent, explainable,
+auditable workflow.
 
 Built for the Safiri AI Software Engineer take-home. See
 [`CONTEXT.md`](CONTEXT.md) for the domain glossary and
@@ -14,8 +15,8 @@ Built for the Safiri AI Software Engineer take-home. See
 
 ## What it does
 
-An operator **creates a shipment**, **ingests mock document data** (JSON/text —
-no OCR), and triggers **validation**. The system:
+An operator **creates a shipment**, **ingests mock document data** (by uploading
+or pasting JSON/CSV/text — no OCR), and triggers **validation**. The system:
 
 - **maps** heterogeneous document fields into a canonical shipment record and
   **reconciles** them — empty fields are filled, conflicting values are preserved
@@ -47,9 +48,13 @@ in services), a global `{ data } | { error }` response envelope + exception
 filter, a winston logger (no sensitive payloads logged), and an append-only audit
 service. Decisions are recorded in [ADR-0001..0003](docs/adr/).
 
-**Frontend** — React + Vite + TypeScript. A read-only triage list and a detail
-view with five tabs (Overview / Documents / Issues / Readiness Report / Audit
-Log) plus a **Run validation** button. Talks to the backend through a dev proxy.
+**Frontend** — React 19 + Vite + TypeScript. A **dashboard** (KPI cards, an
+issues-by-severity donut and a shipments-over-time trend), a triage **list**, and
+a **shipment detail** with five tabs (Overview / Documents / Issues / Readiness
+Report / Audit Log). Documents are **uploaded** (drag-and-drop `.json`/`.csv`/
+`.txt`, parsed in the browser — no OCR) or pasted, and **Run validation** replays
+the engine's real **step-by-step pipeline trace**. Charts are dependency-free
+inline SVG; the app talks to the backend through a dev proxy.
 
 ## Tech stack
 
@@ -124,9 +129,10 @@ docs (request/response schemas, try-it-out) at
 | ------ | ---------------------------------- | ------------------------------------ |
 | POST   | `/shipments`                       | Create a shipment                    |
 | GET    | `/shipments`                       | List shipments (+ `openIssueCount`)  |
+| GET    | `/shipments/stats`                 | Dashboard aggregates (status + severity counts, monthly trend) |
 | GET    | `/shipments/:id`                   | Get one shipment                     |
-| POST   | `/shipments/:id/documents`         | Ingest a document (mapped + reconciled) |
-| POST   | `/shipments/:id/validate`          | Run validation                       |
+| POST   | `/shipments/:id/documents`         | Ingest a document (mapped + reconciled; the UI parses uploads client-side) |
+| POST   | `/shipments/:id/validate`          | Run validation (returns issues, report + a step-by-step `trace`) |
 | GET    | `/shipments/:id/issues`            | List issues (filter with `?severity=CRITICAL`) |
 | GET    | `/shipments/:id/readiness-report`  | Latest readiness report              |
 | GET    | `/shipments/:id/audit-log`         | Audit trail                          |
@@ -221,9 +227,11 @@ Thresholds (`REVIEW_WINDOW_DAYS`, `WEIGHT_TOLERANCE_PCT`) are tunable via config
 - **Two-layer model** (canonical shipment vs per-document ingestion) costs extra
   storage and a mapping step but is what makes provenance and mismatch detection
   possible (ADR-0001).
-- **Read-only frontend** — a dashboard (KPIs, severity donut, shipments-over-time
-  trend), a triage list, and a tabbed shipment detail; no PDF/auth, and the
-  "New Shipment" action is out of scope for the demo (noted under Future work).
+- **Read-mostly frontend** — a dashboard (KPIs, severity donut, shipments-over-time
+  trend), a triage list, and a tabbed shipment detail with document upload and a
+  live validation-pipeline replay. No PDF export yet, and the "New Shipment"
+  create flow is out of scope for the demo (see Future work); route auth is
+  optional (Security section).
 
 ## Security
 
@@ -318,10 +326,10 @@ actual customs clearance.
 
 ## Future work
 
-A shipment-create flow ("New Shipment"), PDF export of the readiness report,
-document file-upload UI and the full approvals dashboard; role-based access
-control (real authenticated actors); CSV bulk import; container check-digit vs.
-live registry verification; live integration with WCO / UN Comtrade / HTS / ISO
+A shipment-create flow ("New Shipment") and PDF export of the readiness report;
+role-based access control and per-tenant authorization (real authenticated
+actors, closing the IDOR gap); CSV bulk import; container check-digit vs. live
+registry verification; live integration with WCO / UN Comtrade / HTS / ISO
 registries in place of the mocked snapshots; and AI-assisted HS-code suggestion
 (designed here, not implemented).
 
