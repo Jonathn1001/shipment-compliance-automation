@@ -19,6 +19,9 @@ export const LOG_LEVELS = [
 ] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+export const NODE_ENVS = ['development', 'test', 'production'] as const;
+export type NodeEnv = (typeof NODE_ENVS)[number];
+
 /**
  * The full set of environment variables the application depends on. This is the
  * single place (with {@link validate}) that reads raw env; every service reads
@@ -49,6 +52,28 @@ export class EnvironmentVariables {
   @Min(0)
   @Max(100)
   WEIGHT_TOLERANCE_PCT: number = 5;
+
+  @IsOptional()
+  @IsIn(NODE_ENVS)
+  NODE_ENV: NodeEnv = 'development';
+
+  // Optional shared bearer token. When set, every route requires
+  // `Authorization: Bearer <token>`; when unset, auth is disabled (demo/dev
+  // default) — see ApiAuthGuard. Kept out of the repo; supplied via the
+  // environment only.
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  API_AUTH_TOKEN?: string;
+
+  // Rate-limit window and per-window request cap (per client IP).
+  @IsInt()
+  @Min(1)
+  THROTTLE_TTL_MS: number = 60_000;
+
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT: number = 300;
 }
 
 /**

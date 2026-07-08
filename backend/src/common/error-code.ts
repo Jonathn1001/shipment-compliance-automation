@@ -13,6 +13,9 @@ import { HttpStatus } from '@nestjs/common';
  *   INT  - uncategorised server fault
  */
 export enum ErrorCode {
+  // SCA-AUTH-001: missing/invalid bearer token when auth is enabled.
+  UNAUTHORIZED = 'SCA-AUTH-001',
+
   // SCA-SHIP-*: shipment resource + lifecycle.
   SHIPMENT_NOT_FOUND = 'SCA-SHIP-001',
   SHIPMENT_BLOCKED = 'SCA-SHIP-002',
@@ -35,6 +38,10 @@ export const ERROR_META: Record<
   ErrorCode,
   { status: HttpStatus; message: string }
 > = {
+  [ErrorCode.UNAUTHORIZED]: {
+    status: HttpStatus.UNAUTHORIZED,
+    message: 'Authentication required.',
+  },
   [ErrorCode.SHIPMENT_NOT_FOUND]: {
     status: HttpStatus.NOT_FOUND,
     message: 'Shipment not found.',

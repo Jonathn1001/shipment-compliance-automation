@@ -29,4 +29,26 @@ export class AppConfigService {
   get weightTolerancePct(): number {
     return this.config.get('WEIGHT_TOLERANCE_PCT', { infer: true });
   }
+
+  /** Shared bearer token; `undefined` disables auth (demo/dev default). */
+  get apiAuthToken(): string | undefined {
+    return this.config.get('API_AUTH_TOKEN', { infer: true });
+  }
+
+  get throttleTtlMs(): number {
+    return this.config.get('THROTTLE_TTL_MS', { infer: true });
+  }
+
+  get throttleLimit(): number {
+    return this.config.get('THROTTLE_LIMIT', { infer: true });
+  }
+
+  get isProduction(): boolean {
+    return this.config.get('NODE_ENV', { infer: true }) === 'production';
+  }
+
+  /** Publish the interactive OpenAPI docs everywhere except production. */
+  get docsEnabled(): boolean {
+    return !this.isProduction;
+  }
 }

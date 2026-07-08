@@ -62,6 +62,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? ErrorCode.INTERNAL_ERROR
           : ErrorCode.CLIENT_ERROR;
       message = extractMessage(exception, message);
+    } else {
+      // Middleware may throw http-errors (e.g. body-parser's PayloadTooLargeError
+      // when the request exceeds the body limit): these carry a numeric status
+      // but are not HttpExceptions. Honor a valid 4xx/5xx status; the reason
+      // phrase — never the raw error message — is returned.
+      const httpStatus = httpErrorStatus(exception);
+      if (httpStatus !== undefined) {
+        statusCode = httpStatus;
+        code =
+          statusCode >= HttpStatus.INTERNAL_SERVER_ERROR
+            ? ErrorCode.INTERNAL_ERROR
+            : ErrorCode.CLIENT_ERROR;
+        message = reasonPhrase(statusCode);
+      }
     }
 
     const envelope: ErrorEnvelope = {
@@ -96,13 +110,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 }
 
+/**
+ * Extract a valid HTTP status from an http-errors-style object (e.g. thrown by
+ * express body-parser), which exposes `status`/`statusCode` but is not an
+ * `HttpException`. Returns undefined for anything without a plausible 4xx/5xx.
+ */
+function httpErrorStatus(exception: unknown): number | undefined {
+  if (typeof exception !== 'object' || exception === null) return undefined;
+  const raw = exception as { status?: unknown; statusCode?: unknown };
+  const status = typeof raw.status === 'number' ? raw.status : raw.statusCode;
+  return typeof status === 'number' && status >= 400 && status <= 599
+    ? status
+    : undefined;
+}
+
 /** Standard HTTP reason phrase for a status; a generic fallback for the rest. */
 function reasonPhrase(status: number): string {
   const phrases: Record<number, string> = {
     [HttpStatus.BAD_REQUEST]: 'Bad Request',
+    [HttpStatus.UNAUTHORIZED]: 'Unauthorized',
     [HttpStatus.NOT_FOUND]: 'Not Found',
     [HttpStatus.CONFLICT]: 'Conflict',
+    [HttpStatus.PAYLOAD_TOO_LARGE]: 'Payload Too Large',
     [HttpStatus.UNPROCESSABLE_ENTITY]: 'Unprocessable Entity',
+    [HttpStatus.TOO_MANY_REQUESTS]: 'Too Many Requests',
     [HttpStatus.INTERNAL_SERVER_ERROR]: 'Internal Server Error',
   };
   return phrases[status] ?? (status >= 500 ? 'Server Error' : 'Error');

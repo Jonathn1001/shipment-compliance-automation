@@ -23,6 +23,9 @@ backend/.pg-data/
 logs/
 *.log
 
+# Playwright MCP scratch (snapshots/screenshots from local UI verification)
+.playwright-mcp/
+
 # editor / OS
 .DS_Store
 .idea/

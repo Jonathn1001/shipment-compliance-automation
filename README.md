@@ -182,14 +182,17 @@ embedded Postgres. All modules were built test-first.
 
 ## Validation rules
 
-Thirteen rules run today (severity in parentheses):
+Sixteen rules run today (severity in parentheses):
 `gross-less-than-net` (critical), `wood-packaging-ispm15` (critical),
 `duplicate-shipment-reference` (critical), `missing-required-field` (high),
-`hs-code-format` (high), `missing-bill-of-lading` (high), `invoice-value` (high),
+`hs-code-format` / WCO (high), `country-of-origin-iso` / ISO 3166 (high),
+`missing-bill-of-lading` (high), `invoice-value` (high),
 `document-shipment-mismatch` (high), `missing-country-of-origin` (medium),
-`weight-discrepancy` (medium), `container-number-format` / ISO-6346 (medium),
-`arrival-date-window` (medium), `certificate-form-e` (medium). Thresholds
-(`REVIEW_WINDOW_DAYS`, `WEIGHT_TOLERANCE_PCT`) are tunable via config.
+`currency-iso` / ISO 4217 (medium), `weight-discrepancy` (medium),
+`container-number-format` / ISO-6346 (medium), `arrival-date-window` (medium),
+`certificate-form-e` (medium), `commodity-country-plausibility` / UN Comtrade
+(low, advisory — flags an unusual origin for a commodity, never blocks).
+Thresholds (`REVIEW_WINDOW_DAYS`, `WEIGHT_TOLERANCE_PCT`) are tunable via config.
 
 ---
 
@@ -197,8 +200,11 @@ Thirteen rules run today (severity in parentheses):
 
 - **No real OCR / parsing.** Document input is mock JSON/text; the raw payload is
   stored as-is alongside its canonical mapping.
-- **No authentication / authorization.** `actor` is a passed value (`x-actor`),
-  not an authenticated principal.
+- **Optional token auth, no per-owner authorization.** Setting `API_AUTH_TOKEN`
+  gates every route behind `Authorization: Bearer <token>` (off by default for
+  the demo); `actor` is still the passed `x-actor`, not an authenticated
+  principal. Per-owner/tenant scoping (IDOR) needs a user model and is out of
+  scope. See the Security section.
 - **Shipment reference is not unique** by design — duplicates must be able to
   persist so the duplicate-reference rule can flag them.
 - **Money and weights** are stored as `Decimal` with pinned precision (never
@@ -215,8 +221,31 @@ Thirteen rules run today (severity in parentheses):
 - **Two-layer model** (canonical shipment vs per-document ingestion) costs extra
   storage and a mapping step but is what makes provenance and mismatch detection
   possible (ADR-0001).
-- **Thin frontend** — read-only, no charts/PDF/auth — to keep focus on the
-  backend workflow; the richer product vision is noted under Future work.
+- **Read-only frontend** — a dashboard (KPIs, severity donut, shipments-over-time
+  trend), a triage list, and a tabbed shipment detail; no PDF/auth, and the
+  "New Shipment" action is out of scope for the demo (noted under Future work).
+
+## Security
+
+Reviewed against the OWASP Top 10 (2021). Controls in place:
+
+- **Injection / mass-assignment (A03):** Prisma parameterizes all SQL; the field
+  mapper is a strict allowlist (unknown payload keys — incl. `__proto__` — are
+  ignored, so no prototype pollution) and the global `ValidationPipe`
+  (`whitelist + forbidNonWhitelisted`) rejects unexpected fields. Untrusted values
+  echoed into issue explanations are stripped of control characters and length-capped.
+- **DoS surface (A04):** per-IP rate limiting (`@nestjs/throttler`) and an explicit
+  64 KB request-body cap (oversized payloads → `413`); the client-side file reader
+  refuses files over 1 MB.
+- **Access control (A01):** optional shared-token guard (`API_AUTH_TOKEN`,
+  constant-time compare) gates every route when set. Per-owner authorization
+  (IDOR) needs a user/tenant model and is intentionally out of scope.
+- **Misconfiguration (A05):** `helmet` security headers, `X-Powered-By` removed,
+  OpenAPI docs served outside production only.
+- **SSRF (A10):** none — reference data (ISO/HS/Comtrade) is committed offline
+  snapshots, so no user input drives an outbound request.
+- **Vulnerable components (A06):** `npm/pnpm audit` clean (a transitive `multer`
+  DoS advisory is pinned to `>=2.2.0`).
 
 ## AI-usage note
 
@@ -269,6 +298,16 @@ correct?" were mine.
   legal advice**, and not a live lookup. Source of the real nomenclature: the
   World Customs Organization (https://www.wcoomd.org/) and public HS/HTS
   references.
+- **ISO 3166-1 countries** and **ISO 4217 currencies** — committed snapshots
+  (`iso-3166.json`, `iso-4217.json`) generated once from node's built-in `Intl`
+  (canonical alpha-2 list + `Intl.supportedValuesOf('currency')`, English names
+  via `Intl.DisplayNames`) by `backend/scripts/gen-iso.mjs`; re-run to refresh.
+  Used to validate country-of-origin and invoice-currency fields offline.
+- **UN Comtrade trade-flow context** — a bounded, mocked snapshot
+  (`comtrade-plausibility.json`) mapping a handful of HS chapters to their
+  well-known major exporting origins. Powers the **advisory** (LOW, never
+  blocking) commodity↔country plausibility check. Illustrative, not exhaustive;
+  refresh from Comtrade export rankings. Source: https://comtradeplus.un.org/.
 - **ISO-6346** container check-digit validation is implemented from the public
   standard's algorithm.
 - **ISPM15** and **Form-E / certificate-of-origin** logic uses simplified,
@@ -279,12 +318,12 @@ actual customs clearance.
 
 ## Future work
 
-Dashboard charts (severity donut, shipments-over-time), PDF export of the
-readiness report, document file-upload UI and the full approvals dashboard;
-role-based access control (real authenticated actors); CSV bulk import; container
-check-digit vs. live registry verification; live integration with WCO / UN
-Comtrade / HTS / ISO registries in place of the mocked snapshot; and AI-assisted
-HS-code suggestion (designed here, not implemented).
+A shipment-create flow ("New Shipment"), PDF export of the readiness report,
+document file-upload UI and the full approvals dashboard; role-based access
+control (real authenticated actors); CSV bulk import; container check-digit vs.
+live registry verification; live integration with WCO / UN Comtrade / HTS / ISO
+registries in place of the mocked snapshots; and AI-assisted HS-code suggestion
+(designed here, not implemented).
 
 ## Documentation
 
