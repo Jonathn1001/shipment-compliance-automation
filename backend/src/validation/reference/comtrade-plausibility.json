@@ -1,0 +1,16 @@
+{
+  "_note": "Mocked plausibility snapshot derived from UN Comtrade export-flow context: for a bounded set of HS chapters, the alpha-2 codes of well-known major exporting origins. NOT a live lookup and NOT exhaustive — an advisory heuristic only. A chapter absent here is 'not covered' and never flagged; within a covered chapter, an origin outside the list yields a LOW 'verify' advisory, never a block. Refresh from Comtrade export rankings.",
+  "chaptersByExporters": {
+    "03": ["CN", "NO", "VN", "IN", "CL", "EC", "TH", "ID", "US", "CA", "RU"],
+    "09": ["BR", "VN", "CO", "ID", "IN", "ET", "HN", "GT", "UG", "KE", "LK"],
+    "27": ["SA", "RU", "US", "CA", "AE", "IQ", "KW", "NO", "NG", "AU", "QA"],
+    "30": ["DE", "CH", "US", "IE", "BE", "IT", "FR", "GB", "IN", "NL", "DK"],
+    "44": ["CA", "US", "CN", "RU", "DE", "BR", "ID", "SE", "FI", "PL", "AT"],
+    "61": ["CN", "BD", "VN", "IN", "TR", "IT", "KH", "ID", "PK", "LK"],
+    "62": ["CN", "BD", "VN", "IN", "TR", "IT", "KH", "ID", "PK", "LK"],
+    "71": ["CH", "GB", "US", "AE", "HK", "IN", "ZA", "AU", "CN", "BE"],
+    "84": ["CN", "US", "DE", "JP", "KR", "MX", "TW", "IT", "NL", "SG"],
+    "85": ["CN", "HK", "KR", "TW", "US", "DE", "JP", "VN", "MY", "SG"],
+    "87": ["DE", "JP", "US", "MX", "KR", "CN", "CA", "ES", "GB", "FR"]
+  }
+}

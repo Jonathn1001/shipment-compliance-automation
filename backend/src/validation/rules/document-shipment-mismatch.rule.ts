@@ -7,6 +7,7 @@ import {
   ValidationContext,
   ValidationRule,
 } from '../validation.types';
+import { quote } from './rule-helpers';
 
 /**
  * A document value that disagrees with an already-set canonical value is a
@@ -34,7 +35,7 @@ export class DocumentShipmentMismatchRule implements ValidationRule {
             issueType: 'document-shipment-mismatch',
             severity: Severity.HIGH,
             field,
-            explanation: `Document value for "${field}" (${String(documentValue)}) disagrees with the shipment record (${String(canonicalValue)}).`,
+            explanation: `Document value for "${field}" (${quote(documentValue)}) disagrees with the shipment record (${quote(canonicalValue)}).`,
             suggestedAction: `Reconcile "${field}": confirm whether the document or the shipment record is correct.`,
           },
         ];

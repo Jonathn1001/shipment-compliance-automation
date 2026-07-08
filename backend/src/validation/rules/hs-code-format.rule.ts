@@ -6,7 +6,7 @@ import {
   ValidationContext,
   ValidationRule,
 } from '../validation.types';
-import { isBlank } from './rule-helpers';
+import { isBlank, quote } from './rule-helpers';
 
 /**
  * When an HS code is present, it must be well-formed (6-10 digits) and its
@@ -27,7 +27,7 @@ export class HsCodeFormatRule implements ValidationRule {
         issueType: 'hs-code-format',
         severity: Severity.HIGH,
         field: 'hsCode',
-        explanation: `HS code "${code}" is not a valid, known classification (bad format or unknown chapter).`,
+        explanation: `HS code ${quote(code)} is not a valid, known classification (bad format or unknown chapter).`,
         suggestedAction:
           'Correct the HS code to a valid WCO classification (6-10 digits).',
       },

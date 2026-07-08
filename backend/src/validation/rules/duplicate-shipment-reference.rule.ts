@@ -5,6 +5,7 @@ import {
   ValidationContext,
   ValidationRule,
 } from '../validation.types';
+import { quote } from './rule-helpers';
 
 /**
  * The shipment reference must be unique across records. Because the reference is
@@ -21,7 +22,7 @@ export class DuplicateShipmentReferenceRule implements ValidationRule {
         issueType: 'duplicate-shipment-reference',
         severity: Severity.CRITICAL,
         field: 'shipmentReference',
-        explanation: `Shipment reference "${ctx.shipment.shipmentReference}" is used by ${ctx.otherShipmentsWithSameReference} other shipment(s).`,
+        explanation: `Shipment reference ${quote(ctx.shipment.shipmentReference)} is used by ${ctx.otherShipmentsWithSameReference} other shipment(s).`,
         suggestedAction:
           'Resolve the duplicate: correct the reference or merge the duplicate records.',
       },

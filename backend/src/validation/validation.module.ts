@@ -5,7 +5,10 @@ import { ShipmentModule } from '../shipment/shipment.module';
 import { ReadinessReportRepository } from './readiness-report.repository';
 import { ArrivalDateWindowRule } from './rules/arrival-date-window.rule';
 import { CertificateFormERule } from './rules/certificate-form-e.rule';
+import { CommodityCountryPlausibilityRule } from './rules/commodity-country-plausibility.rule';
 import { ContainerNumberFormatRule } from './rules/container-number-format.rule';
+import { CountryOfOriginIsoRule } from './rules/country-of-origin-iso.rule';
+import { CurrencyIsoRule } from './rules/currency-iso.rule';
 import { DocumentShipmentMismatchRule } from './rules/document-shipment-mismatch.rule';
 import { DuplicateShipmentReferenceRule } from './rules/duplicate-shipment-reference.rule';
 import { GrossLessThanNetRule } from './rules/gross-less-than-net.rule';
@@ -27,6 +30,9 @@ const RULES = [
   MissingRequiredFieldRule,
   HsCodeFormatRule,
   MissingCountryOfOriginRule,
+  CountryOfOriginIsoRule,
+  CurrencyIsoRule,
+  CommodityCountryPlausibilityRule,
   WeightDiscrepancyRule,
   MissingBillOfLadingRule,
   ContainerNumberFormatRule,

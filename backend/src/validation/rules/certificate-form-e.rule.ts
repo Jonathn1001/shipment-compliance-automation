@@ -5,7 +5,7 @@ import {
   ValidationContext,
   ValidationRule,
 } from '../validation.types';
-import { isBlank } from './rule-helpers';
+import { isBlank, quote } from './rule-helpers';
 
 /**
  * Origins with a preferential-tariff agreement require a Certificate of Origin
@@ -29,7 +29,7 @@ export class CertificateFormERule implements ValidationRule {
         issueType: 'certificate-form-e',
         severity: Severity.MEDIUM,
         field: 'eformCertificate',
-        explanation: `Origin "${countryOfOrigin as string}" is expected to carry a Form-E certificate of origin, but none is recorded.`,
+        explanation: `Origin ${quote(countryOfOrigin)} is expected to carry a Form-E certificate of origin, but none is recorded.`,
         suggestedAction:
           'Obtain the Form-E certificate of origin to claim preferential duty.',
       },

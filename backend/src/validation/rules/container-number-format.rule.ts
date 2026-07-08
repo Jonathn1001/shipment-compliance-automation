@@ -6,7 +6,7 @@ import {
   ValidationContext,
   ValidationRule,
 } from '../validation.types';
-import { isBlank } from './rule-helpers';
+import { isBlank, quote } from './rule-helpers';
 
 /**
  * When a container number is present it must be a valid ISO-6346 number (catches
@@ -25,7 +25,7 @@ export class ContainerNumberFormatRule implements ValidationRule {
         issueType: 'container-number-format',
         severity: Severity.MEDIUM,
         field: 'containerNumber',
-        explanation: `Container number "${containerNumber as string}" is not a valid ISO-6346 number.`,
+        explanation: `Container number ${quote(containerNumber)} is not a valid ISO-6346 number.`,
         suggestedAction:
           'Correct the container number (4 letters + 7 digits with a valid check digit).',
       },
