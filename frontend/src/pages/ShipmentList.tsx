@@ -1,15 +1,54 @@
-import { useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import type { ShipmentListRow } from '../api/types';
 import { StatusBadge } from '../components/StatusBadge';
-import { useAsync } from '../hooks/useAsync';
+
+const PAGE_SIZE = 50;
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 export function ShipmentList() {
   const navigate = useNavigate();
-  const load = useCallback(() => api.listShipments(), []);
-  const { data, loading, error } = useAsync(load, []);
+  const [rows, setRows] = useState<ShipmentListRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // A page shorter than PAGE_SIZE means there is nothing left to fetch.
+  const [reachedEnd, setReachedEnd] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    api
+      .listShipments({ limit: PAGE_SIZE })
+      .then((page) => {
+        if (!active) return;
+        setRows(page);
+        setReachedEnd(page.length < PAGE_SIZE);
+      })
+      .catch((e: unknown) => active && setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const loadMore = async () => {
+    const last = rows[rows.length - 1];
+    if (!last) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.listShipments({ limit: PAGE_SIZE, cursor: last.id });
+      setRows((prev) => [...prev, ...page]);
+      setReachedEnd(page.length < PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <section>
@@ -28,7 +67,7 @@ export function ShipmentList() {
             </tr>
           </thead>
           <tbody>
-            {data?.map((s) => (
+            {rows.map((s) => (
               <tr
                 key={s.id}
                 onClick={() => navigate(`/shipments/${s.id}`)}
@@ -49,8 +88,14 @@ export function ShipmentList() {
           </tbody>
         </table>
         {loading && <div className="empty-state">Loading…</div>}
-        {!loading && data?.length === 0 && <div className="empty-state">No shipments yet.</div>}
+        {!loading && rows.length === 0 && <div className="empty-state">No shipments yet.</div>}
       </div>
+
+      {!loading && !reachedEnd && rows.length > 0 && (
+        <button className="btn" onClick={loadMore} disabled={loadingMore} style={{ marginTop: 16 }}>
+          {loadingMore ? 'Loading…' : 'Load more'}
+        </button>
+      )}
     </section>
   );
 }

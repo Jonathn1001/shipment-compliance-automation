@@ -28,6 +28,15 @@ export class ApiError extends Error {
   }
 }
 
+/** Build a `?a=1&b=2` query string, dropping undefined/empty values. */
+function qs(params?: Record<string, string | number | undefined>): string {
+  if (!params) return '';
+  const pairs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+  return pairs.length ? `?${pairs.join('&')}` : '';
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'content-type': 'application/json' },
@@ -49,7 +58,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listShipments: () => request<ShipmentListRow[]>('/shipments'),
+  // Keyset pagination: pass the id of the last row held as `cursor` for the next
+  // page. A page shorter than `limit` means the end has been reached.
+  listShipments: (params?: { limit?: number; cursor?: string }) =>
+    request<ShipmentListRow[]>(`/shipments${qs(params)}`),
   getStats: () => request<ShipmentStats>('/shipments/stats'),
   getShipment: (id: string) => request<Shipment>(`/shipments/${id}`),
   getDocuments: (id: string) => request<DocumentIngestion[]>(`/shipments/${id}/documents`),
