@@ -2,9 +2,13 @@
 // data to render. Shipments are inserted in their raw state — run validation via
 // the API or the frontend's "Run validation" button to generate issues, statuses
 // and readiness reports. Safe to re-run: it clears the tables first.
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
 
-const prisma = new PrismaClient();
+// Prisma 7 connects through a driver adapter; the seed reads DATABASE_URL from
+// the environment (set by the caller) the same way the app's PrismaService does.
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   // Order matters: children first (FKs cascade, but be explicit for clarity).

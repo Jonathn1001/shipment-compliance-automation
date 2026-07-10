@@ -1,11 +1,13 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client';
 import { AppConfigService } from '../config/app-config.service';
 
 /**
- * Prisma client as a Nest provider. The datasource URL is taken from the typed
- * config (not read from `process.env` here) so configuration stays centralized
- * and the connection target is explicit and testable.
+ * Prisma client as a Nest provider. Prisma 7 connects through a driver adapter
+ * rather than a schema/datasource URL; the pg adapter is fed the connection
+ * string from the typed config (not `process.env` here) so configuration stays
+ * centralized and the connection target is explicit and testable.
  */
 @Injectable()
 export class PrismaService
@@ -13,7 +15,7 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor(config: AppConfigService) {
-    super({ datasourceUrl: config.databaseUrl });
+    super({ adapter: new PrismaPg({ connectionString: config.databaseUrl }) });
   }
 
   async onModuleInit(): Promise<void> {
