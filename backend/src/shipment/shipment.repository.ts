@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Severity, ShipmentStatus } from '../../generated/prisma/client';
+import { keysetArgs, PageOpts } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../prisma/prisma-tx';
 
@@ -30,16 +31,18 @@ export class ShipmentRepository {
   }
 
   /**
-   * Shipments for the triage list, newest first, each with a count of its OPEN
-   * validation issues (the list screen's "issue count" column). Uses a filtered
-   * relation `_count` so counting happens in one query, not N+1.
+   * A page of shipments for the triage list, newest first, each with a count of
+   * its OPEN validation issues (the list screen's "issue count" column). Uses a
+   * filtered relation `_count` so counting happens in one query, not N+1. Bounded
+   * by `opts.take`; `id` is the keyset tiebreaker so `updatedAt` ties page cleanly.
    */
-  async list() {
+  async list(opts: PageOpts) {
     const rows = await this.prisma.shipment.findMany({
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       include: {
         _count: { select: { issues: { where: { status: 'OPEN' } } } },
       },
+      ...keysetArgs(opts),
     });
     return rows.map(({ _count, ...shipment }) => ({
       ...shipment,

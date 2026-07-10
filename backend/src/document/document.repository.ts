@@ -4,6 +4,7 @@ import {
   Prisma,
   SourceType,
 } from '../../generated/prisma/client';
+import { keysetArgs, PageOpts } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../prisma/prisma-tx';
 
@@ -28,10 +29,15 @@ export class DocumentRepository {
     return client.documentIngestion.create({ data: input });
   }
 
-  findByShipment(shipmentId: string) {
+  /**
+   * A shipment's ingested documents, newest first. `opts` bounds the HTTP list
+   * read; the internal merge path (validation) omits it to fold in every document.
+   */
+  findByShipment(shipmentId: string, opts?: PageOpts) {
     return this.prisma.documentIngestion.findMany({
       where: { shipmentId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...(opts ? keysetArgs(opts) : {}),
     });
   }
 }

@@ -4,6 +4,7 @@ import {
   Severity,
   ValidationIssue,
 } from '../../generated/prisma/client';
+import { keysetArgs, PageOpts } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrismaTx } from '../prisma/prisma-tx';
 import { IssueDraft } from './validation.types';
@@ -30,10 +31,11 @@ export interface ReconcileResult {
 export class ValidationIssueRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByShipment(shipmentId: string, severity?: Severity) {
+  findByShipment(shipmentId: string, severity?: Severity, opts?: PageOpts) {
     return this.prisma.validationIssue.findMany({
       where: { shipmentId, ...(severity ? { severity } : {}) },
-      orderBy: [{ severity: 'desc' }, { issueType: 'asc' }],
+      orderBy: [{ severity: 'desc' }, { issueType: 'asc' }, { id: 'desc' }],
+      ...(opts ? keysetArgs(opts) : {}),
     });
   }
 

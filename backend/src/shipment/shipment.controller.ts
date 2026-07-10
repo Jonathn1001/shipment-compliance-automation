@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { pageOpts, PaginationQueryDto } from '../common/pagination';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { ShipmentService } from './shipment.service';
 
@@ -20,8 +21,8 @@ export class ShipmentController {
   }
 
   @Get()
-  findAll() {
-    return this.shipmentService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.shipmentService.findAll(pageOpts(query));
   }
 
   // Declared before `:id` so the literal path is not captured as an id.

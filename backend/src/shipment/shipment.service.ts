@@ -7,6 +7,7 @@ import {
 } from '../../generated/prisma/client';
 import { AppException } from '../common/app.exception';
 import { ErrorCode } from '../common/error-code';
+import { PageOpts } from '../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
@@ -58,8 +59,8 @@ export class ShipmentService {
     return shipment;
   }
 
-  findAll() {
-    return this.repository.list();
+  findAll(opts: PageOpts) {
+    return this.repository.list(opts);
   }
 
   /**

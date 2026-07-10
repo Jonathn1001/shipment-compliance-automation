@@ -110,4 +110,41 @@ describe('Shipments (e2e)', () => {
       code: 'SCA-VAL-001',
     });
   });
+
+  it('bounds a list page by ?limit and pages by keyset cursor', async () => {
+    // The three created last are the newest, so they lead the newest-first list.
+    const ids: string[] = [];
+    for (const shipmentReference of ['PAGE-A', 'PAGE-B', 'PAGE-C']) {
+      const created = await request(app.getHttpServer())
+        .post('/shipments')
+        .send({ shipmentReference })
+        .expect(201);
+      ids.push(created.body.data.id);
+    }
+
+    const page1 = await request(app.getHttpServer())
+      .get('/shipments?limit=2')
+      .expect(200);
+    expect(page1.body.data).toHaveLength(2);
+    const page1Ids: string[] = page1.body.data.map((r: { id: string }) => r.id);
+    page1Ids.forEach((id) => expect(ids).toContain(id));
+
+    const cursor = page1Ids[1];
+    const page2 = await request(app.getHttpServer())
+      .get(`/shipments?limit=2&cursor=${cursor}`)
+      .expect(200);
+    const page2Ids: string[] = page2.body.data.map((r: { id: string }) => r.id);
+    // Keyset seeks past the cursor row — no overlap with the first page.
+    page1Ids.forEach((id) => expect(page2Ids).not.toContain(id));
+    // The one created id not on page 1 surfaces once we page past the first two.
+    const remaining = ids.find((id) => !page1Ids.includes(id)) as string;
+    expect(page2Ids).toContain(remaining);
+  });
+
+  it('rejects an out-of-range ?limit with a 422 { error } envelope', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/shipments?limit=0')
+      .expect(422);
+    expect(res.body.error).toMatchObject({ statusCode: 422, code: 'SCA-VAL-001' });
+  });
 });

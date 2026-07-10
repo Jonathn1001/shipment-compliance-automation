@@ -3,16 +3,16 @@ import { AuditAction, Prisma, Shipment } from '../../generated/prisma/client';
 import { AppException } from '../common/app.exception';
 import { ErrorCode } from '../common/error-code';
 import { AuditService } from '../audit/audit.service';
+import { PageOpts } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
+import { toJsonInput } from '../prisma/prisma-json';
 import { ShipmentRepository } from '../shipment/shipment.repository';
-import { CanonicalFields } from './canonical';
+import { CanonicalFields, CanonicalKey } from './canonical';
+import { CANONICAL_KEYS, FIELD_KIND } from './canonical-fields';
 import { DocumentRepository } from './document.repository';
 import { IngestDocumentDto } from './dto/ingest-document.dto';
 import { mapDocument } from './field-mapper';
 import { FieldFill, reconcile } from './reconciler';
-
-const asJson = (value: unknown): Prisma.InputJsonValue =>
-  value as Prisma.InputJsonValue;
 
 @Injectable()
 export class DocumentService {
@@ -45,8 +45,8 @@ export class DocumentService {
           shipmentId,
           documentType: dto.documentType,
           sourceType: dto.sourceType,
-          rawInput: asJson(dto.payload),
-          mappedFields: asJson(mapped),
+          rawInput: toJsonInput(dto.payload),
+          mappedFields: toJsonInput(mapped),
         },
         tx,
       );
@@ -65,7 +65,7 @@ export class DocumentService {
         AuditAction.DOCUMENT_INGESTED,
         shipmentId,
         actor,
-        asJson({
+        toJsonInput({
           documentId: document.id,
           documentType: dto.documentType,
           sourceType: dto.sourceType,
@@ -80,7 +80,7 @@ export class DocumentService {
           AuditAction.FIELD_UPDATED,
           shipmentId,
           actor,
-          asJson({
+          toJsonInput({
             field: fill.field,
             oldValue: null,
             newValue: fill.newValue,
@@ -97,8 +97,8 @@ export class DocumentService {
     });
   }
 
-  listForShipment(shipmentId: string) {
-    return this.documents.findByShipment(shipmentId);
+  listForShipment(shipmentId: string, opts: PageOpts) {
+    return this.documents.findByShipment(shipmentId, opts);
   }
 
   /**
@@ -125,37 +125,37 @@ export class DocumentService {
   }
 }
 
-/** Project a persisted shipment into the plain canonical shape the reconciler expects. */
+/**
+ * Project a persisted shipment into the plain canonical shape the reconciler
+ * expects — driven by {@link FIELD_KIND} so a new field needs no edit here:
+ * decimals become strings (precision preserved), dates ISO strings, the rest
+ * pass through; null/undefined columns are dropped.
+ */
 function toCanonical(s: Shipment): CanonicalFields {
-  return {
-    exporter: s.exporter ?? undefined,
-    importer: s.importer ?? undefined,
-    importerId: s.importerId ?? undefined,
-    invoiceNumber: s.invoiceNumber ?? undefined,
-    invoiceValue: s.invoiceValue?.toString(),
-    currency: s.currency ?? undefined,
-    goodsDescription: s.goodsDescription ?? undefined,
-    hsCode: s.hsCode ?? undefined,
-    countryOfOrigin: s.countryOfOrigin ?? undefined,
-    grossWeightKg: s.grossWeightKg?.toString(),
-    netWeightKg: s.netWeightKg?.toString(),
-    numberOfPackages: s.numberOfPackages ?? undefined,
-    containerNumber: s.containerNumber ?? undefined,
-    billOfLadingNumber: s.billOfLadingNumber ?? undefined,
-    packagingType: s.packagingType ?? undefined,
-    ispm15Certified: s.ispm15Certified ?? undefined,
-    eformCertificate: s.eformCertificate ?? undefined,
-    freightMode: s.freightMode ?? undefined,
-    arrivalDate: s.arrivalDate?.toISOString(),
-  };
+  const row = s as unknown as Record<CanonicalKey, unknown>;
+  const out: CanonicalFields = {};
+  for (const key of CANONICAL_KEYS) {
+    const value = row[key];
+    if (value === null || value === undefined) continue;
+    (out[key] as unknown) =
+      FIELD_KIND[key] === 'decimal'
+        ? (value as Prisma.Decimal).toString()
+        : FIELD_KIND[key] === 'date'
+          ? (value as Date).toISOString()
+          : value;
+  }
+  return out;
 }
 
-/** Turn reconciler fills into a Prisma update (arrivalDate coerced back to Date). */
+/**
+ * Turn reconciler fills into a Prisma update. Date-kind fields are carried as ISO
+ * strings in the canonical shape and coerced back to `Date` for the column.
+ */
 function fillsToUpdate(fills: FieldFill[]): Prisma.ShipmentUpdateInput {
   const update: Record<string, unknown> = {};
   for (const fill of fills) {
     update[fill.field] =
-      fill.field === 'arrivalDate'
+      FIELD_KIND[fill.field] === 'date'
         ? new Date(fill.newValue as string)
         : fill.newValue;
   }

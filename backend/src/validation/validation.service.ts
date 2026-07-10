@@ -7,10 +7,12 @@ import {
 } from '../../generated/prisma/client';
 import { AppException } from '../common/app.exception';
 import { ErrorCode } from '../common/error-code';
+import { PageOpts } from '../common/pagination';
 import { AuditService } from '../audit/audit.service';
 import { AppConfigService } from '../config/app-config.service';
 import { DocumentService } from '../document/document.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { toJsonInput } from '../prisma/prisma-json';
 import { ShipmentRepository } from '../shipment/shipment.repository';
 import { ReadinessReportRepository } from './readiness-report.repository';
 import { buildReadinessReport } from './report-builder';
@@ -23,8 +25,6 @@ import {
   ValidationStep,
   VALIDATION_RULES,
 } from './validation.types';
-
-const asJson = (v: unknown) => v as Parameters<AuditService['record']>[3];
 
 @Injectable()
 export class ValidationService {
@@ -92,7 +92,7 @@ export class ValidationService {
         AuditAction.VALIDATION_RUN,
         shipmentId,
         actor,
-        asJson({
+        toJsonInput({
           ruleCount: this.rules.length,
           issueCount: activeIssues.length,
           created: counts.created,
@@ -111,7 +111,7 @@ export class ValidationService {
           AuditAction.STATUS_CHANGED,
           shipmentId,
           actor,
-          asJson({ oldValue: previousStatus, newValue: nextStatus }),
+          toJsonInput({ oldValue: previousStatus, newValue: nextStatus }),
           tx,
         );
       }
@@ -126,7 +126,7 @@ export class ValidationService {
         AuditAction.REPORT_GENERATED,
         shipmentId,
         actor,
-        asJson({ reportId: report.id, assessment: report.overallAssessment }),
+        toJsonInput({ reportId: report.id, assessment: report.overallAssessment }),
         tx,
       );
 
@@ -184,8 +184,8 @@ export class ValidationService {
     });
   }
 
-  listIssues(shipmentId: string, severity?: Severity) {
-    return this.issues.findByShipment(shipmentId, severity);
+  listIssues(shipmentId: string, severity?: Severity, opts?: PageOpts) {
+    return this.issues.findByShipment(shipmentId, severity, opts);
   }
 
   latestReport(shipmentId: string) {

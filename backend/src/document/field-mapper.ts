@@ -1,5 +1,6 @@
 import { DocumentType } from '../../generated/prisma/client';
 import { CanonicalFields, CanonicalKey } from './canonical';
+import { CANONICAL_KEYS, FIELD_KIND } from './canonical-fields';
 
 /**
  * Field mapper — pure normalization of a heterogeneous document payload into the
@@ -88,18 +89,8 @@ const TYPE_SCOPED_ALIASES: Partial<
   [DocumentType.CERTIFICATE_FORM_E]: { eformCertificate: ['number'] },
 };
 
-const DECIMAL_FIELDS = new Set<CanonicalKey>([
-  'invoiceValue',
-  'grossWeightKg',
-  'netWeightKg',
-]);
-const INT_FIELDS = new Set<CanonicalKey>(['numberOfPackages']);
-const BOOL_FIELDS = new Set<CanonicalKey>(['ispm15Certified']);
-
 const normalizeKey = (key: string): string =>
   key.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-const CANONICAL_KEYS = Object.keys(BASE_ALIASES) as CanonicalKey[];
 
 export function mapDocument(
   rawInput: Record<string, unknown>,
@@ -137,10 +128,18 @@ function coerce(
   value: unknown,
 ): string | number | boolean | undefined {
   if (value === null || value === undefined) return undefined;
-  if (DECIMAL_FIELDS.has(field)) return toDecimalString(value);
-  if (INT_FIELDS.has(field)) return toInt(value);
-  if (BOOL_FIELDS.has(field)) return toBool(value);
-  return toTrimmedString(value);
+  switch (FIELD_KIND[field]) {
+    case 'decimal':
+      return toDecimalString(value);
+    case 'int':
+      return toInt(value);
+    case 'bool':
+      return toBool(value);
+    // 'string' and 'date' are both carried as trimmed strings in the canonical
+    // shape (a date is an ISO string here; it becomes a Date only on persist).
+    default:
+      return toTrimmedString(value);
+  }
 }
 
 function toTrimmedString(value: unknown): string | undefined {

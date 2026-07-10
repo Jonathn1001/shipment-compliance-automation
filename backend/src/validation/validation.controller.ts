@@ -2,6 +2,7 @@ import { Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Severity } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { MAX_PAGE_SIZE, pageOpts, PaginationQueryDto } from '../common/pagination';
 import { ListIssuesQueryDto } from './dto/list-issues-query.dto';
 import { ValidationService } from './validation.service';
 
@@ -30,7 +31,11 @@ export class ValidationController {
     description: 'Return only issues of this severity.',
   })
   issues(@Param('id') id: string, @Query() query: ListIssuesQueryDto) {
-    return this.validation.listIssues(id, query.severity);
+    return this.validation.listIssues(
+      id,
+      query.severity,
+      pageOpts(query, MAX_PAGE_SIZE),
+    );
   }
 
   @Get('readiness-report')
@@ -39,7 +44,7 @@ export class ValidationController {
   }
 
   @Get('audit-log')
-  auditLog(@Param('id') id: string) {
-    return this.audit.listForShipment(id);
+  auditLog(@Param('id') id: string, @Query() query: PaginationQueryDto) {
+    return this.audit.listForShipment(id, pageOpts(query, MAX_PAGE_SIZE));
   }
 }

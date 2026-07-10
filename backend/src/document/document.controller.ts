@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { MAX_PAGE_SIZE, pageOpts, PaginationQueryDto } from '../common/pagination';
 import { DocumentService } from './document.service';
 import { IngestDocumentDto } from './dto/ingest-document.dto';
 
@@ -22,7 +23,10 @@ export class DocumentController {
   }
 
   @Get()
-  list(@Param('id') shipmentId: string) {
-    return this.documentService.listForShipment(shipmentId);
+  list(@Param('id') shipmentId: string, @Query() query: PaginationQueryDto) {
+    return this.documentService.listForShipment(
+      shipmentId,
+      pageOpts(query, MAX_PAGE_SIZE),
+    );
   }
 }

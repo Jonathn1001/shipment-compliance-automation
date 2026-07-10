@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuditAction, Prisma } from '../../generated/prisma/client';
+import { keysetArgs, PageOpts } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** A Prisma client capable of the audit writes — the root client or a `$transaction` client. */
@@ -35,10 +36,13 @@ export class AuditLogRepository {
     });
   }
 
-  findByShipment(shipmentId: string) {
+  /** A shipment's audit trail, newest first, bounded by `opts` (append-only, grows
+   *  every run — `id` tiebreaks same-timestamp rows for a stable keyset page). */
+  findByShipment(shipmentId: string, opts?: PageOpts) {
     return this.prisma.auditLog.findMany({
       where: { shipmentId },
-      orderBy: { timestamp: 'desc' },
+      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
+      ...(opts ? keysetArgs(opts) : {}),
     });
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuditAction, Prisma } from '../../generated/prisma/client';
+import { PageOpts } from '../common/pagination';
 import { AuditDbClient, AuditLogRepository } from './audit-log.repository';
 
 /** Actor defaults to the system when a human actor is not supplied. */
@@ -26,7 +27,7 @@ export class AuditService {
     );
   }
 
-  listForShipment(shipmentId: string) {
-    return this.repository.findByShipment(shipmentId);
+  listForShipment(shipmentId: string, opts?: PageOpts) {
+    return this.repository.findByShipment(shipmentId, opts);
   }
 }
