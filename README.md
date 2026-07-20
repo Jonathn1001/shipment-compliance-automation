@@ -60,7 +60,7 @@ inline SVG; the app talks to the backend through a dev proxy.
 
 | Layer     | Choice                                             |
 | --------- | -------------------------------------------------- |
-| Backend   | NestJS 11, Prisma 6, PostgreSQL, pnpm              |
+| Backend   | NestJS 11, Prisma 7, PostgreSQL, pnpm              |
 | Frontend  | React 19, Vite 7, TypeScript, npm                  |
 | Tests     | Jest (unit + e2e via supertest), embedded-postgres |
 
