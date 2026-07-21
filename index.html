@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shipment Compliance, Under the Hood</title>
+
+  <!-- Google Fonts: Bricolage Grotesque · DM Sans · JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Accent: teal (maritime / trade) -->
+  <style>
+    :root {
+      --color-accent:       #2A7B9B;
+      --color-accent-hover: #1F6280;
+      --color-accent-light: #E4F2F7;
+      --color-accent-muted: #5A9DB8;
+    }
+  </style>
+
+  <script src="main.js" defer></script>
+</head>
+<body>
+
+  <nav class="nav" id="nav">
+    <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    <div class="nav-inner">
+      <span class="nav-title">Shipment Compliance, Under the Hood</span>
+      <div class="nav-dots" id="nav-dots" role="tablist">
+        <button class="nav-dot" data-target="module-1" data-tooltip="The Mission & the Journey" role="tab" aria-label="Module 1: The Mission and the Journey"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="The Data Model" role="tab" aria-label="Module 2: The Data Model"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="Messy Docs to Clean Data" role="tab" aria-label="Module 3: Messy Docs to Clean Data"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="The Validation Engine" role="tab" aria-label="Module 4: The Validation Engine"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="Production-Minded" role="tab" aria-label="Module 5: Production-Minded"></button>
+        <button class="nav-dot" data-target="module-6" data-tooltip="The Architecture, End to End" role="tab" aria-label="Module 6: The Architecture, End to End"></button>
+        <button class="nav-dot" data-target="module-7" data-tooltip="How I Worked" role="tab" aria-label="Module 7: How I Worked — Methodology and Problem-Solving"></button>
+        <button class="nav-dot" data-target="module-8" data-tooltip="Take-Home to Production" role="tab" aria-label="Module 8: Take-Home to Production"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- modules/*.html content is assembled here by build.sh -->
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">The Mission &amp; the Journey</h1>
+      <p class="module-subtitle">What you built, why it matters to a logistics company, and the exact path a shipment takes through it &mdash; framed for a 30-minute interview on problem-solving and technical methodology.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The one-sentence pitch</h2>
+        <p>Before a cargo shipment can cross a border, a human has to check that its paperwork is complete and self-consistent. This project automates the boring, error-prone part of that check.</p>
+        <p>It <span class="term" data-definition="Ingest means to take in raw data from an outside source and bring it into your system. Say to an interviewer: 'the module ingests structured and semi-structured shipment data.'">ingests</span> shipment data, <span class="term" data-definition="Validation is checking that data obeys a set of rules — here, compliance rules like 'weights must be plausible' or 'country of origin must be a real country code.'">validates</span> it against compliance rules, flags every problem, and produces a <span class="term" data-definition="A readiness report is the module's final output: a plain summary of whether a shipment can proceed, needs a human to sign off, or is blocked — plus the reasons.">readiness report</span> a person can act on.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why Safiri cares</strong>
+            <p>Global trade drowns in repeated manual checks, inconsistent data, and time-sensitive reviews. A module like this turns a 20-minute manual paperwork review into a 2-second automated one — with a human only for the cases that genuinely need judgment.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">How to use this for a 30-minute interview</strong>
+            <p>This walkthrough defends the two things the interview scores directly: <strong>problem-solving</strong> and <strong>technical methodology</strong>. Modules 2&ndash;6 give you the system knowledge for &ldquo;walk me through X.&rdquo; <strong>Module 7 &mdash; How I Worked</strong> targets the two axes head-on: decomposition, documented assumptions, testing method, systematic debugging, and the AI-usage note the rubric requires.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: the pre-flight inspection</h2>
+        <p>Think of a cargo plane before takeoff. A ground crew runs a fixed checklist — fuel, weight balance, doors, papers. Any item can pass, warn, or hard-stop the flight. A pilot signs off only when the checklist is clean.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">📋</div>
+            <div>
+              <strong>The checklist = the validation rules</strong>
+              <p>Each rule is one independent check — a plane has dozens, so does compliance.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">⚠️</div>
+            <div>
+              <strong>Pass / warn / hard-stop = severity</strong>
+              <p>A cracked window grounds the plane; a scuffed seat just gets noted. Same idea: CRITICAL blocks, LOW is a note.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🖊️</div>
+            <div>
+              <strong>The pilot's sign-off = human review</strong>
+              <p>The module never ships anything itself — it decides whether a human must look, then a human approves.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The journey: one click, end to end</h2>
+        <p>Picture a customs broker. They drop a commercial invoice into the screen and click <strong>Ingest</strong>, then click <strong>Run validation</strong>. Here is everything that fires under the hood — step through it.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"The broker drops an invoice JSON and clicks Ingest."},
+          {"highlight":"flow-actor-1","label":"The raw document travels to the backend.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"The Field Mapper renames messy keys to canonical ones; the Reconciler fills only the empty fields."},
+          {"highlight":"flow-actor-2","label":"Filled values flow into the shipment; disagreements are set aside as conflicts.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"The Shipment — the single source of truth — is updated and every change is audited."},
+          {"highlight":"flow-actor-1","label":"Now the broker clicks Run validation.","packet":true,"from":"actor-1","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Every rule runs against the current shipment; issues are re-computed and a status is resolved."},
+          {"highlight":"flow-actor-4","label":"A readiness report is appended to the shipment history.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-5","label":"Final answer: READY, NEEDS_REVIEW, or BLOCKED — with the reasons attached."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🖥️</div>
+              <span>Operator UI</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">🔧</div>
+              <span>Map + Reconcile</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">📦</div>
+              <span>Shipment</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">✅</div>
+              <span>Validation</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">📄</div>
+              <span>Report</span>
+            </div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to trace the journey</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Interview-ready framing</strong>
+            <p>Notice the journey splits into two distinct jobs: <em>ingest</em> (get clean data in) and <em>validate</em> (judge the data). Keeping them separate is a deliberate design choice — you can re-validate a shipment a hundred times without re-ingesting a single document.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Your click, in real code</h2>
+        <p>When the broker opens a shipment, the screen needs five different things at once. Rather than ask for them one after another, the frontend asks for all five <span class="term" data-definition="In parallel means doing several things at the same time instead of one-then-the-next. Promise.all fires all the requests together and waits for the slowest one — much faster than a chain.">in parallel</span>.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code><span class="code-line"><span class="code-keyword">const</span> load = <span class="code-function">useCallback</span>(<span class="code-keyword">async</span> () => {</span>
+<span class="code-line">  <span class="code-keyword">const</span> [shipment, documents, issues, report, audit] =</span>
+<span class="code-line">    <span class="code-keyword">await</span> Promise.<span class="code-function">all</span>([</span>
+<span class="code-line">      api.<span class="code-function">getShipment</span>(id),</span>
+<span class="code-line">      api.<span class="code-function">getDocuments</span>(id),</span>
+<span class="code-line">      api.<span class="code-function">getIssues</span>(id),</span>
+<span class="code-line">      api.<span class="code-function">getReadinessReport</span>(id),</span>
+<span class="code-line">      api.<span class="code-function">getAuditLog</span>(id),</span>
+<span class="code-line">    ]);</span>
+<span class="code-line">  <span class="code-keyword">return</span> { shipment, documents, issues, report, audit };</span>
+<span class="code-line">}, [id]);</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define a loader for one shipment&rsquo;s full picture.</p>
+              <p class="tl">Grab five things and unpack them into five names&hellip;</p>
+              <p class="tl"><code>Promise.all</code> fires all five requests at the same time&hellip;</p>
+              <p class="tl">the shipment record itself,</p>
+              <p class="tl">its ingested documents,</p>
+              <p class="tl">its validation issues,</p>
+              <p class="tl">its latest readiness report,</p>
+              <p class="tl">and its audit trail.</p>
+              <p class="tl">Wait for the slowest, then hand back all five together.</p>
+              <p class="tl">Re-run this whenever the shipment id changes.</p>
+            </div>
+          </div>
+        </div>
+        <p>This is a small but real production instinct: avoid a <span class="term" data-definition="A waterfall is when requests run one-after-another, each waiting for the previous — the page feels slow because the delays add up. Firing them in parallel avoids it.">request waterfall</span>. It is the kind of detail an interviewer notices.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>No memorizing — these test whether you can reason about the design the way you would in the interview room.</p>
+
+        <div class="quiz-container" id="quiz-module1">
+          <div class="quiz-question-block"
+               data-correct="opt-conflict"
+               data-explanation-right="The canonical shipment is the source of truth, so a document never overwrites a set value — the disagreement is preserved as a conflict and later flagged by a rule. That preserved disagreement is itself a compliance signal."
+               data-explanation-wrong="Think about who is the source of truth. A document that contradicts an already-set field should not silently win — the disagreement is worth keeping, not discarding.">
+            <h3 class="quiz-question">You ingest a packing list whose importer name differs from the importer already on the shipment. What does the module do?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-overwrite" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Overwrites the shipment with the document&rsquo;s value</span></button>
+              <button class="quiz-option" data-value="opt-reject" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Rejects the whole ingest with an error</span></button>
+              <button class="quiz-option" data-value="opt-conflict" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Keeps the shipment value and records a conflict</span></button>
+              <button class="quiz-option" data-value="opt-merge" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Silently averages or merges the two</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-revalidate"
+               data-explanation-right="Ingest and validate are separate jobs. Fixing a field and re-running validation is cheap and does not require touching any document — the engine just recomputes from the current shipment state."
+               data-explanation-wrong="Re-read the two-jobs split. You do not need to re-ingest documents to re-judge a shipment — validation runs against the shipment&rsquo;s current state on demand.">
+            <h3 class="quiz-question">An operator fixes a wrong weight on a shipment. What is the cheapest way to get an up-to-date verdict?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-reingest" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Re-ingest every document from scratch</span></button>
+              <button class="quiz-option" data-value="opt-revalidate" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Just click Run validation again</span></button>
+              <button class="quiz-option" data-value="opt-newship" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Create a brand-new shipment</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-human"
+               data-explanation-right="The module produces a recommendation and a status — it never approves or ships anything by itself. A human always makes the final call, which is exactly what a compliance workflow demands."
+               data-explanation-wrong="Look again at the mission. This is a decision-support tool: it flags and recommends, but a person owns the final approval.">
+            <h3 class="quiz-question">The module marks a shipment NEEDS_REVIEW. Who moves it forward?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-auto" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The module auto-approves after a timeout</span></button>
+              <button class="quiz-option" data-value="opt-human" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A human reviews and approves it</span></button>
+              <button class="quiz-option" data-value="opt-never" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Nothing — it is stuck forever</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Next: meet the five characters that make all of this work — the data model. →</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-2" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">The Data Model</h1>
+      <p class="module-subtitle">Five characters run the whole show. Knowing who does what is how you answer &ldquo;walk me through your schema.&rdquo;</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: the patient chart</h2>
+        <p>A hospital keeps one master chart per patient — the single authoritative record. Lab reports arrive and update it, doctors write diagnoses, a discharge summary is produced, and nurses log every action with a timestamp that is never erased.</p>
+        <p>This module has exactly those five roles.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">📦</div>
+            <h4 class="pattern-title">Shipment</h4>
+            <p class="pattern-desc">The master chart. The single source of truth, filled in over time.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📑</div>
+            <h4 class="pattern-title">DocumentIngestion</h4>
+            <p class="pattern-desc">A lab report that came in — stored raw <em>and</em> as clean data.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🚩</div>
+            <h4 class="pattern-title">ValidationIssue</h4>
+            <p class="pattern-desc">A diagnosis — one specific problem a rule found.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📄</div>
+            <h4 class="pattern-title">ReadinessReport</h4>
+            <p class="pattern-desc">The discharge summary — the decision, snapshotted.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🧾</div>
+            <h4 class="pattern-title">AuditLog</h4>
+            <p class="pattern-desc">The nurses&rsquo; notes — one timestamped line per action, never erased.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Shipment is the source of truth</h2>
+        <p>A shipment is <span class="term" data-definition="A record is a single row of related data — here, everything known about one consignment: its reference, importer, weights, and so on.">created</span> with almost nothing and gets completed over time. It carries a lifecycle — a small set of named states it can be in.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">schema.prisma</span>
+            <pre><code><span class="code-line"><span class="code-keyword">enum</span> <span class="code-function">ShipmentStatus</span> {</span>
+<span class="code-line">  CREATED</span>
+<span class="code-line">  READY</span>
+<span class="code-line">  NEEDS_REVIEW</span>
+<span class="code-line">  BLOCKED</span>
+<span class="code-line">  APPROVED</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">The complete list of states a shipment may hold&hellip;</p>
+              <p class="tl">just born — barely any data yet.</p>
+              <p class="tl">clean — safe to proceed.</p>
+              <p class="tl">a human must look before it moves.</p>
+              <p class="tl">a hard stop — it cannot be approved.</p>
+              <p class="tl">a human signed off — done.</p>
+              <p class="tl">Defining these as an <span class="term" data-definition="An enum (enumeration) is a fixed, named set of allowed values. Using one means the database and code can only ever hold one of these five — no typos, no surprise states.">enum</span> means only these five values can ever exist.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗂️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Say this in the interview</strong>
+            <p>&ldquo;Most shipment fields are nullable on purpose — a shipment starts as a near-empty shell and is progressively completed from documents. The rules then flag which required fields are still missing.&rdquo;</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why documents get their own layer</h2>
+        <p>A tempting shortcut is to let each document write straight onto the shipment row. That throws away two things the business actually needs.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔍</div>
+            <h4 class="pattern-title">Provenance</h4>
+            <p class="pattern-desc">What did this document actually contain, and when? Each ingestion stores the <span class="term" data-definition="The raw input is the document exactly as it arrived, byte for byte, before any cleanup — kept so you can always prove what was received.">raw payload</span> untouched.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">⚖️</div>
+            <h4 class="pattern-title">Disagreement</h4>
+            <p class="pattern-desc">When a document contradicts the record, that clash is itself a compliance signal — so it must survive, not be silently overwritten.</p>
+          </div>
+        </div>
+
+        <p>So each <span class="term" data-definition="DocumentIngestion is one database row per document received. It holds both the raw payload and the cleaned-up 'mapped' version of that document.">DocumentIngestion</span> keeps both layers: <code>rawInput</code> (exactly as received) and <code>mappedFields</code> (the clean, canonical projection). This is the load-bearing decision of the whole design (documented in ADR-0001).</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Some things are written once, forever</h2>
+        <p>Two of the five characters are <span class="term" data-definition="Append-only means you only ever add new rows — you never edit or delete existing ones. Like a ship's logbook: history is preserved, not rewritten.">append-only</span>. You never edit them; you only add new entries.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🕰️</div>
+            <div>
+              <strong>Every validation run appends a new ReadinessReport</strong>
+              <p>You get a timeline of how a shipment&rsquo;s compliance posture changed — not just the latest verdict.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🔒</div>
+            <div>
+              <strong>Every state-changing action appends one AuditLog entry</strong>
+              <p>Created, ingested, field-updated, validated, approved — a tamper-evident trail auditors can trust.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: append-only is a compliance superpower</strong>
+            <p>In regulated domains, &ldquo;how did we get here?&rdquo; matters as much as &ldquo;where are we?&rdquo; Append-only history answers the first question for free. Overwriting would destroy the evidence.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch them talk</h2>
+        <p>Here is the cast during a single ingest-then-validate, as a group chat. Step through it — notice who defers to whom.</p>
+
+        <div class="chat-window" id="chat-module2">
+          <div class="chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="shipment" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">S</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Shipment</span>
+                <p>I only know my reference so far. Currency, weights, half my fields — all empty.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="document" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">D</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">DocumentIngestion</span>
+                <p>Just arrived — a commercial invoice. I carry an importer, an invoice value, and a currency.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="shipment" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">S</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Shipment</span>
+                <p>Fill my empty fields — but do not overwrite anything I already set. I am the source of truth.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="document" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">D</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">DocumentIngestion</span>
+                <p>Your currency was blank, so it is now USD. Your importer already said &ldquo;Acme&rdquo; but I say &ldquo;Globex&rdquo; — I will not touch it.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="audit" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">AuditLog</span>
+                <p>Logging both: currency FILLED, importer CONFLICT. And whatever happens, none of my lines ever get erased.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="issue" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">I</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">ValidationIssue</span>
+                <p>Validation just ran. I am a MEDIUM: the document&rsquo;s importer disagrees with the record. That is why the conflict was worth keeping.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="6" data-sender="report" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">R</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">ReadinessReport</span>
+                <p>Summary: 1 warning, status NEEDS_REVIEW, human review required. I get appended to the history — the previous report stays.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-typing" id="chat-module2-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module2-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <div class="quiz-container" id="quiz-module2">
+          <div class="quiz-question-block"
+               data-correct="opt-doc"
+               data-explanation-right="The disagreement is captured because DocumentIngestion keeps the document&rsquo;s own value separately from the Shipment — later a rule compares them and raises an issue. If documents wrote straight onto the shipment, the clash would vanish."
+               data-explanation-wrong="Think about which entity preserves what the document said, separately from the record. If a document overwrote the shipment, there would be nothing left to disagree with.">
+            <h3 class="quiz-question">A document says the country of origin is CN, but the shipment says DE. Which design choice makes it possible to flag this later?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-doc" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Documents are stored as their own layer, separate from the shipment</span></button>
+              <button class="quiz-option" data-value="opt-enum" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Status is stored as an enum</span></button>
+              <button class="quiz-option" data-value="opt-cuid" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Each row has a unique id</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-append"
+               data-explanation-right="Because reports and audit entries are append-only, the full history survives. You can replay how the shipment&rsquo;s status evolved run by run — nothing was overwritten."
+               data-explanation-wrong="If reports were overwritten each run, you would only ever see the latest one. Think about which property preserves the whole timeline.">
+            <h3 class="quiz-question">An auditor asks: &ldquo;show me every readiness verdict this shipment ever had.&rdquo; Why can you answer instantly?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-append" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Reports are append-only, so every run&rsquo;s report is kept</span></button>
+              <button class="quiz-option" data-value="opt-cache" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The frontend caches old reports</span></button>
+              <button class="quiz-option" data-value="opt-recompute" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>You recompute the old verdicts from scratch</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-raw"
+               data-explanation-right="rawInput preserves the document exactly as received. mappedFields is the cleaned-up version. Keeping the raw copy is what lets you prove, months later, what a document actually said."
+               data-explanation-wrong="One of the two document layers is the untouched original. The cleaned-up 'mapped' version is derived from it — but the untouched one is what proves what really arrived.">
+            <h3 class="quiz-question">To defend against a dispute (&ldquo;that invoice never said 45,000&rdquo;), which stored value settles it?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-mapped" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The mapped fields (cleaned version)</span></button>
+              <button class="quiz-option" data-value="opt-raw" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The raw input (the document exactly as received)</span></button>
+              <button class="quiz-option" data-value="opt-issue" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The validation issue</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Next: how a chaotic document actually becomes clean shipment data. →</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">Messy Docs &rarr; Clean Data</h1>
+      <p class="module-subtitle">Real shipment documents are inconsistent. Two small pure functions tame them — and they are the answer to &ldquo;how do you handle bad input?&rdquo;</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: the universal travel adapter</h2>
+        <p>Every country has a different plug shape, but your laptop needs one socket. A travel adapter accepts any plug and fits it to the one socket you have.</p>
+        <p>Shipment documents are the plugs. The same fact — the invoice&rsquo;s value — shows up under a dozen different key names.</p>
+
+        <div class="badge-list stagger-children">
+          <div class="badge-item animate-in"><code class="badge-code">invoice_value</code><span class="badge-desc">&rarr; maps to <strong>invoiceValue</strong></span></div>
+          <div class="badge-item animate-in"><code class="badge-code">total_value</code><span class="badge-desc">&rarr; maps to <strong>invoiceValue</strong></span></div>
+          <div class="badge-item animate-in"><code class="badge-code">amount</code><span class="badge-desc">&rarr; maps to <strong>invoiceValue</strong></span></div>
+          <div class="badge-item animate-in"><code class="badge-code">Invoice Value</code><span class="badge-desc">&rarr; maps to <strong>invoiceValue</strong></span></div>
+        </div>
+
+        <p>The <span class="term" data-definition="The Field Mapper is a pure function that renames a document&rsquo;s messy keys to the project&rsquo;s standard 'canonical' field names — the universal adapter for shipment data.">Field Mapper</span> is the adapter: any of these plugs, one <span class="term" data-definition="Canonical means the one official, standard form. The canonical field name is the single agreed spelling the rest of the system uses.">canonical</span> socket.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 1 — ignore the noise in a key</h2>
+        <p>Before matching, every key is stripped down: lowercased, punctuation removed. That is why <code>invoice_value</code>, <code>Invoice Value</code>, and <code>invoiceValue</code> are treated as the same key.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">field-mapper.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">const</span> <span class="code-function">normalizeKey</span> = (key: <span class="code-function">string</span>): <span class="code-function">string</span> =></span>
+<span class="code-line">  key.<span class="code-function">toLowerCase</span>().<span class="code-function">replace</span>(<span class="code-string">/[^a-z0-9]/g</span>, <span class="code-string">''</span>);</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Take any key name and boil it down&hellip;</p>
+              <p class="tl">make it all lowercase, then delete everything that is not a letter or a number. <code>"Invoice Value"</code> becomes <code>invoicevalue</code> — now it matches its cousins.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why this is &ldquo;semi-structured&rdquo;-friendly</strong>
+            <p>The take-home asked for structured <em>and</em> semi-structured input. Loose key-matching is exactly what makes the same mapper swallow tidy JSON, a slightly-off CSV header, and a hand-typed field alike.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 2 — turn text into the right type</h2>
+        <p>A value like <code>"1200"</code> from a document is just text. A weight needs to be a number, a certification flag needs to be a true/false. One tiny function decides how to convert each field — driven by a single lookup table.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">field-mapper.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">function</span> <span class="code-function">coerce</span>(field, value) {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (value === <span class="code-keyword">null</span> || value === <span class="code-keyword">undefined</span>) <span class="code-keyword">return</span> <span class="code-keyword">undefined</span>;</span>
+<span class="code-line">  <span class="code-keyword">switch</span> (FIELD_KIND[field]) {</span>
+<span class="code-line">    <span class="code-keyword">case</span> <span class="code-string">'decimal'</span>: <span class="code-keyword">return</span> <span class="code-function">toDecimalString</span>(value);</span>
+<span class="code-line">    <span class="code-keyword">case</span> <span class="code-string">'int'</span>:     <span class="code-keyword">return</span> <span class="code-function">toInt</span>(value);</span>
+<span class="code-line">    <span class="code-keyword">case</span> <span class="code-string">'bool'</span>:    <span class="code-keyword">return</span> <span class="code-function">toBool</span>(value);</span>
+<span class="code-line">    <span class="code-keyword">default</span>:       <span class="code-keyword">return</span> <span class="code-function">toTrimmedString</span>(value);</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Given a field and a raw value&hellip;</p>
+              <p class="tl">if there is nothing there, skip it.</p>
+              <p class="tl">Look up what kind of field this is&hellip;</p>
+              <p class="tl">money &rarr; keep exact precision as text,</p>
+              <p class="tl">a count &rarr; whole number,</p>
+              <p class="tl">a yes/no flag &rarr; true or false,</p>
+              <p class="tl">anything else &rarr; a trimmed string.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">One table to rule them all</strong>
+            <p><code>FIELD_KIND</code> is a single lookup of every field&rsquo;s type. Adding a new field means adding <em>one line</em> there — the mapper, the database projection, and the update logic all read from it. That is &ldquo;don&rsquo;t repeat yourself&rdquo; done right, and a great thing to point at when asked about maintainability.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 3 — reconcile without overwriting</h2>
+        <p>Now the clean document data meets the shipment. The <span class="term" data-definition="The Reconciler is a pure function that decides, per field, whether a document should fill an empty shipment value or whether it conflicts with an already-set one.">Reconciler</span> makes one decision per field, and it never overwrites.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">reconciler.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">for</span> (<span class="code-keyword">const</span> field <span class="code-keyword">of</span> Object.<span class="code-function">keys</span>(incoming)) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> documentValue = incoming[field];</span>
+<span class="code-line">  <span class="code-keyword">if</span> (<span class="code-function">isEmpty</span>(documentValue)) <span class="code-keyword">continue</span>;</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> canonicalValue = current[field];</span>
+<span class="code-line">  <span class="code-keyword">if</span> (<span class="code-function">isEmpty</span>(canonicalValue)) {</span>
+<span class="code-line">    fills.<span class="code-function">push</span>({ field, oldValue: <span class="code-keyword">undefined</span>, newValue: documentValue });</span>
+<span class="code-line">  } <span class="code-keyword">else if</span> (!<span class="code-function">valuesEqual</span>(field, canonicalValue, documentValue)) {</span>
+<span class="code-line">    conflicts.<span class="code-function">push</span>({ field, canonicalValue, documentValue });</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">For each field the document supplied&hellip;</p>
+              <p class="tl">grab the document&rsquo;s value.</p>
+              <p class="tl">If the document had nothing there, skip.</p>
+              <p class="tl"></p>
+              <p class="tl">Now look at what the shipment currently holds.</p>
+              <p class="tl">If the shipment&rsquo;s field was empty&hellip;</p>
+              <p class="tl"><strong>FILL</strong> it from the document.</p>
+              <p class="tl">Otherwise, if they disagree&hellip;</p>
+              <p class="tl">record a <strong>CONFLICT</strong> — but leave the shipment untouched.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The whole decision in three branches</h2>
+        <p>Every incoming field lands in exactly one of these buckets.</p>
+
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="flow-step-num">1</div>
+            <p><strong>Document empty?</strong><br/>Skip — nothing to do.</p>
+          </div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-step">
+            <div class="flow-step-num">2</div>
+            <p><strong>Shipment empty?</strong><br/><span style="color: var(--color-success)">FILL</span> from the document (and audit it).</p>
+          </div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-step">
+            <div class="flow-step-num">3</div>
+            <p><strong>They differ?</strong><br/><span style="color: var(--color-error)">CONFLICT</span> — keep the record, flag later.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧪</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why &ldquo;pure functions&rdquo; keeps coming up</strong>
+            <p>Both the mapper and reconciler are <span class="term" data-definition="A pure function takes inputs and returns an output with no side effects — no database, no network, no randomness. Same inputs always give the same output, so it is trivial to test.">pure functions</span>: no database, no network. That means the trickiest logic in the system can be unit-tested in milliseconds with plain objects — no test database required.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <div class="quiz-container" id="quiz-module3">
+          <div class="quiz-question-block"
+               data-correct="opt-fill"
+               data-explanation-right="The shipment field was empty, so the reconciler FILLS it from the document — and records a FIELD_UPDATED audit entry. Filling empties is always safe; only set-and-differing values become conflicts."
+               data-explanation-wrong="Re-check the three branches. If the shipment&rsquo;s field is empty, there is nothing to disagree with — the document safely fills it.">
+            <h3 class="quiz-question">The shipment has no currency yet. A document arrives with currency USD. What happens?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-fill" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The shipment&rsquo;s currency is filled with USD</span></button>
+              <button class="quiz-option" data-value="opt-conflict" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It is recorded as a conflict</span></button>
+              <button class="quiz-option" data-value="opt-skip" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It is skipped entirely</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-alias"
+               data-explanation-right="total_value is one of the registered aliases for invoiceValue, and normalizeKey ignores case and punctuation, so it maps cleanly. You would tell an interviewer: &lsquo;the mapper uses an alias table with loose key matching.&rsquo;"
+               data-explanation-wrong="The mapper keeps a list of known aliases per field and matches keys loosely (ignoring case and punctuation). Think about whether &lsquo;total_value&rsquo; is a known synonym for the invoice value.">
+            <h3 class="quiz-question">A CSV shows a column <code>Total_Value</code>. The canonical field is <code>invoiceValue</code>. Does it map?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-alias" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Yes — total_value is a known alias and matching ignores case/punctuation</span></button>
+              <button class="quiz-option" data-value="opt-exact" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>No — keys must match the canonical name exactly</span></button>
+              <button class="quiz-option" data-value="opt-ai" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only if an AI model guesses it</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-pure"
+               data-explanation-right="Because the mapper and reconciler are pure — no database, no side effects — you test them with plain in-memory objects. That is why the hardest logic has the fastest, most thorough tests."
+               data-explanation-wrong="The mapper and reconciler deliberately avoid touching a database. That property has a name, and it is what makes them so easy to test in isolation.">
+            <h3 class="quiz-question">Why can the mapping and reconciliation logic be tested without spinning up a database?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-pure" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>They are pure functions — inputs in, outputs out, no side effects</span></button>
+              <button class="quiz-option" data-value="opt-mock" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The database is always mocked automatically</span></button>
+              <button class="quiz-option" data-value="opt-skip" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>They are not tested</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Next: the heart of the system — the validation engine. →</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Validation Engine</h1>
+      <p class="module-subtitle">The heart of the system — and the part an interviewer will dig into hardest. Three ideas: pluggable rules, stateless recompute, and severity &rarr; status.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: a panel of independent inspectors</h2>
+        <p>Imagine a line of inspectors, each an expert in exactly one thing — one checks weights, one checks country codes, one checks wood-packaging certificates. Each raises a flag or stays silent. None of them knows or cares what the others do.</p>
+        <p>Hiring a new inspector does not require rebuilding the line. That is the single most important property of this engine.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧩</div>
+          <div class="callout-content">
+            <strong class="callout-title">The term for it: open/closed</strong>
+            <p>The engine is <span class="term" data-definition="Open/closed principle: code should be open to extension but closed to modification. You add new behavior (a new rule) without editing the existing engine — less risk of breaking what already works.">open for extension, closed for modification</span>. Adding a rule is adding a class — the engine code never changes. Say exactly that in the interview.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What one inspector looks like</h2>
+        <p>Every rule is a class with one method: <code>evaluate</code>. It gets the shipment&rsquo;s context and returns a list of problems — empty if all is well.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">currency-iso.rule.ts</span>
+            <pre><code><span class="code-line"><span class="code-function">evaluate</span>(ctx: ValidationContext): IssueDraft[] {</span>
+<span class="code-line">  <span class="code-keyword">const</span> { currency } = ctx.shipment;</span>
+<span class="code-line">  <span class="code-keyword">if</span> (<span class="code-function">isBlank</span>(currency)) <span class="code-keyword">return</span> [];</span>
+<span class="code-line">  <span class="code-keyword">if</span> (<span class="code-function">isKnownCurrency</span>(currency)) <span class="code-keyword">return</span> [];</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">return</span> [{</span>
+<span class="code-line">    issueType: <span class="code-string">'currency-iso'</span>,</span>
+<span class="code-line">    severity: Severity.MEDIUM,</span>
+<span class="code-line">    field: <span class="code-string">'currency'</span>,</span>
+<span class="code-line">    explanation: <span class="code-string">`Currency ...  is not a known ISO 4217 code.`</span>,</span>
+<span class="code-line">    suggestedAction: <span class="code-string">'Correct the currency ...'</span>,</span>
+<span class="code-line">  }];</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Look at just the currency field.</p>
+              <p class="tl">If it is blank, this rule has no opinion — return nothing.</p>
+              <p class="tl">If it is a real currency code, also fine — return nothing.</p>
+              <p class="tl"></p>
+              <p class="tl">Otherwise, raise one issue&hellip;</p>
+              <p class="tl">tagged with its rule-code,</p>
+              <p class="tl">a severity of MEDIUM (a warning, not a hard stop),</p>
+              <p class="tl">which field it is about,</p>
+              <p class="tl">a human-readable explanation,</p>
+              <p class="tl">and a concrete suggested fix.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🎚️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Notice the discipline</strong>
+            <p>A missing currency is a <em>different</em> rule&rsquo;s job. Each rule fires on exactly one concern and stays silent otherwise — that is what keeps 16 rules from stepping on each other.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The engine barely does anything</h2>
+        <p>Because rules are self-contained, the engine that runs them all is almost trivial: hand each rule the context, collect every issue.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">validation.service.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">const</span> drafts: IssueDraft[] = <span class="code-keyword">this</span>.rules.<span class="code-function">flatMap</span>((rule) =></span>
+<span class="code-line">  rule.<span class="code-function">evaluate</span>(ctx),</span>
+<span class="code-line">);</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Ask every registered rule to evaluate the shipment&hellip;</p>
+              <p class="tl">run each one&rsquo;s <code>evaluate</code>,</p>
+              <p class="tl">and merge all their issues into one flat list.</p>
+            </div>
+          </div>
+        </div>
+        <p>The rules are <span class="term" data-definition="Dependency injection: instead of a class creating its own helpers, they are handed to it from outside. Here the whole list of rules is injected into the engine, so swapping the rule set never touches the engine.">injected</span> as a list. Want a new check? Add a class to that list. The three lines above never change.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Stateless recompute — but waivers survive</h2>
+        <p>Every run recomputes <em>all</em> rules from the shipment&rsquo;s current state, then reconciles the fresh results against the old ones by a stable key: <code>(issueType, field)</code>. Four things can happen to an issue.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-success)">
+            <div class="pattern-icon" style="background: var(--color-success)">✨</div>
+            <h4 class="pattern-title">Created</h4>
+            <p class="pattern-desc">A brand-new problem &rarr; inserted as OPEN.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-info)">
+            <div class="pattern-icon" style="background: var(--color-info)">🔁</div>
+            <h4 class="pattern-title">Refreshed</h4>
+            <p class="pattern-desc">Still a problem &rarr; kept OPEN, details updated.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-text-muted)">
+            <div class="pattern-icon" style="background: var(--color-text-muted)">✅</div>
+            <h4 class="pattern-title">Resolved</h4>
+            <p class="pattern-desc">Fixed since last run &rarr; marked RESOLVED, kept for history.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🛡️</div>
+            <h4 class="pattern-title">Waived-kept</h4>
+            <p class="pattern-desc">A human accepted the risk &rarr; never re-raised.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The tension this resolves</strong>
+            <p>Re-running must never show <em>stale</em> issues — yet a <span class="term" data-definition="A waiver is a human decision to accept a known risk. Once waived, the system must not keep nagging about that same issue on every future run.">waiver</span> a person granted must never be nagged about again. Recompute-plus-reconcile gives you both: fresh results, durable human decisions.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Issues in, a single verdict out</h2>
+        <p>Once the issues settle, one pure function turns their severities into the shipment&rsquo;s readiness status. No hidden state — just the issues.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">status-resolver.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">resolveStatus</span>(issues) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> hasCritical = issues.<span class="code-function">some</span>((i) => i.severity === CRITICAL);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (hasCritical)</span>
+<span class="code-line">    <span class="code-keyword">return</span> { status: <span class="code-string">'BLOCKED'</span>, humanReviewRequired: <span class="code-keyword">true</span> };</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> hasReviewable = issues.<span class="code-function">some</span>(</span>
+<span class="code-line">    (i) => i.severity === HIGH || i.severity === MEDIUM);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (hasReviewable)</span>
+<span class="code-line">    <span class="code-keyword">return</span> { status: <span class="code-string">'NEEDS_REVIEW'</span>, humanReviewRequired: <span class="code-keyword">true</span> };</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">return</span> { status: <span class="code-string">'READY'</span>, humanReviewRequired: <span class="code-keyword">false</span> };</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Given the list of active issues&hellip;</p>
+              <p class="tl">is any of them CRITICAL?</p>
+              <p class="tl">If so &rarr; BLOCKED. A human must act; it cannot proceed.</p>
+              <p class="tl"></p>
+              <p class="tl">Otherwise, is any HIGH or MEDIUM?</p>
+              <p class="tl">&hellip;</p>
+              <p class="tl">If so &rarr; NEEDS_REVIEW. A human must sign off.</p>
+              <p class="tl"></p>
+              <p class="tl">Otherwise &rarr; READY. Clear to proceed.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🚧</div>
+          <div class="callout-content">
+            <strong class="callout-title">Guarded approval</strong>
+            <p>The same model protects the exit: a BLOCKED shipment <em>cannot</em> be approved — the API refuses with a <span class="term" data-definition="HTTP 409 Conflict: a status code meaning the request clashes with the current state of the resource — here, you cannot approve something that is blocked.">409 Conflict</span>. The only way forward is to fix or waive the blocking issue and re-validate.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The whole run, phase by phase</h2>
+        <p>All of it happens inside one <span class="term" data-definition="A transaction is a group of database changes that either all succeed together or all get undone — so a validation run can never leave the data half-updated.">database transaction</span>. Step through the pipeline.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Load context: the shipment, tunable thresholds, duplicate-reference count, and merged document values."},
+          {"highlight":"flow-actor-1","label":"Hand that context to every rule.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"Run all rules; collect a flat list of fresh issue drafts."},
+          {"highlight":"flow-actor-2","label":"Send the drafts to be reconciled against stored issues.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Reconcile by (issueType, field): create, refresh, resolve, keep waived."},
+          {"highlight":"flow-actor-3","label":"Pass the active issues to the status resolver.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Resolve status: any CRITICAL blocks; any HIGH or MEDIUM needs review; else ready."},
+          {"highlight":"flow-actor-4","label":"Build and append a readiness report.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-5","label":"Persist the report and audit the whole run. Commit the transaction."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1"><div class="flow-actor-icon">🧾</div><span>Context</span></div>
+            <div class="flow-actor" id="flow-actor-2"><div class="flow-actor-icon">🔎</div><span>Rules</span></div>
+            <div class="flow-actor" id="flow-actor-3"><div class="flow-actor-icon">🔁</div><span>Reconcile</span></div>
+            <div class="flow-actor" id="flow-actor-4"><div class="flow-actor-icon">⚖️</div><span>Status</span></div>
+            <div class="flow-actor" id="flow-actor-5"><div class="flow-actor-icon">📄</div><span>Report</span></div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to run the pipeline</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <div class="quiz-container" id="quiz-module4">
+          <div class="quiz-question-block"
+               data-correct="opt-class"
+               data-explanation-right="A new rule is a new class added to the injected rule list. The engine&rsquo;s loop is untouched, and because issueType is a free-form string rule-code, there is no database migration either."
+               data-explanation-wrong="Remember open/closed. You should be able to add a check without editing the engine. Think about what the smallest unit of &lsquo;a rule&rsquo; is here.">
+            <h3 class="quiz-question">Product wants a new check: &ldquo;HS code must match the goods description.&rdquo; What is the smallest change?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-class" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Add one new rule class to the rule list</span></button>
+              <button class="quiz-option" data-value="opt-engine" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Edit the engine&rsquo;s core loop</span></button>
+              <button class="quiz-option" data-value="opt-migrate" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Run a database migration to add an issue type</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-waive"
+               data-explanation-right="Waiving records a human decision to accept the risk. On the next recompute, that issue is kept as WAIVED and does not count toward the status — so the shipment is no longer blocked by it, without deleting the record."
+               data-explanation-wrong="Deleting the rule would silence it for everyone, forever — too broad. There is a per-shipment way for a human to accept one specific risk while keeping the record.">
+            <h3 class="quiz-question">A shipment is BLOCKED by one issue that a compliance officer has judged acceptable. How do they move it forward without weakening the rule for everyone?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-delete" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Delete the rule from the codebase</span></button>
+              <button class="quiz-option" data-value="opt-waive" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Waive that specific issue, then re-validate</span></button>
+              <button class="quiz-option" data-value="opt-edit-db" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Hand-edit the status in the database</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-recompute"
+               data-explanation-right="Validation recomputes every rule from current state each run, so the fixed weight makes the old issue disappear (marked RESOLVED) and the status is recalculated. No stale issues linger."
+               data-explanation-wrong="The engine does not patch individual issues in place; it recomputes the whole set from the current shipment each run. Think about what that means for an issue whose cause is now fixed.">
+            <h3 class="quiz-question">An operator fixes the weight that caused a CRITICAL issue and re-validates. Why does the shipment stop being BLOCKED?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-recompute" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Recompute finds the issue no longer fires, so it is resolved and the status is recalculated</span></button>
+              <button class="quiz-option" data-value="opt-manual" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Someone must manually clear the old issue</span></button>
+              <button class="quiz-option" data-value="opt-cache" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A cache expires after a while</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Next: what makes this &ldquo;production-minded&rdquo; instead of just working. →</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">Production-Minded</h1>
+      <p class="module-subtitle">&ldquo;Beyond code that merely works&rdquo; — the error handling, security, and tests that separate a strong submission from a demo.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: a well-run building</h2>
+        <p>A working building has walls and a roof. A <em>safe</em> building also has fire doors, keycard locks, an occupancy limit, and regular drills. None of that shows up in the brochure — but it is what keeps the building standing when something goes wrong.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🚪</div>
+            <h4 class="pattern-title">Fire doors</h4>
+            <p class="pattern-desc">The global error filter — one failure never leaks smoke (internals) everywhere.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔑</div>
+            <h4 class="pattern-title">Keycard locks</h4>
+            <p class="pattern-desc">An optional auth gate on every route.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">👥</div>
+            <h4 class="pattern-title">Occupancy limit</h4>
+            <p class="pattern-desc">Rate limiting and a body-size cap keep abuse out.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🧯</div>
+            <h4 class="pattern-title">Fire drills</h4>
+            <p class="pattern-desc">Tests that prove the system behaves under stress.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Every error speaks one language</h2>
+        <p>Whatever goes wrong — a known domain error, a bad route, an unexpected crash — the client always gets the same shape: <code>{ error: { code, message, ... } }</code>. Clients branch on a stable <span class="term" data-definition="An error code is a short, unchanging string like SCA-SHIP-001 that identifies a specific failure. Clients check the code (not the human message, which may be reworded) to decide what to do.">error code</span>, never on fragile wording.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">all-exceptions.filter.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">if</span> (statusCode >= <span class="code-number">500</span>) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> detail = exception <span class="code-keyword">instanceof</span> Error</span>
+<span class="code-line">    ? (exception.stack ?? exception.message)</span>
+<span class="code-line">    : <span class="code-function">String</span>(exception);</span>
+<span class="code-line">  <span class="code-keyword">this</span>.logger.<span class="code-function">error</span>(summary, detail);</span>
+<span class="code-line">} <span class="code-keyword">else</span> {</span>
+<span class="code-line">  <span class="code-keyword">this</span>.logger.<span class="code-function">warn</span>(summary);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">If this is a real server error (500+)&hellip;</p>
+              <p class="tl">grab the underlying details — the <span class="term" data-definition="A stack trace is the breadcrumb trail of function calls that led to an error — invaluable for debugging, but must stay server-side.">stack trace</span> if we have one&hellip;</p>
+              <p class="tl"></p>
+              <p class="tl"></p>
+              <p class="tl">and log it <em>server-side</em> so we can debug.</p>
+              <p class="tl">For ordinary client mistakes (4xx)&hellip;</p>
+              <p class="tl">just a one-line warning is enough.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔐</div>
+          <div class="callout-content">
+            <strong class="callout-title">Security by omission</strong>
+            <p>The stack trace is logged, never sent to the client. Request bodies and raw document payloads are <em>never</em> logged. An attacker learns nothing from an error; an engineer learns everything from the logs.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Defense in depth</h2>
+        <p>No single lock is trusted to do everything. Several independent layers each block a different class of abuse.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-1)">🪖</div><div><strong>Helmet</strong><p>Sets protective HTTP security headers on every response.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-2)">📏</div><div><strong>64 KB body limit</strong><p>An oversized payload is rejected before it is ever parsed or stored.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-3)">⏱️</div><div><strong>Rate limiting (throttler)</strong><p>Caps requests per client over a sliding window — blunts brute-force and denial-of-service.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-4)">✋</div><div><strong>Validation pipe</strong><p>Rejects unknown or malformed fields with a precise <span class="term" data-definition="HTTP 422 Unprocessable Entity: the request was understood but the data failed validation. Here it comes with per-field details so the client knows exactly what to fix.">422</span> and per-field details.</p></div></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A tiny detail that signals seniority</h2>
+        <p>When an auth token is configured, the guard compares it in <span class="term" data-definition="Constant-time comparison always takes the same amount of time regardless of how many characters match. It stops attackers from guessing a secret one character at a time by measuring response speed.">constant time</span> — so an attacker cannot guess the token character-by-character by timing responses.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">api-auth.guard.ts</span>
+            <pre><code><span class="code-line"><span class="code-keyword">function</span> <span class="code-function">safeEqual</span>(a: <span class="code-function">string</span>, b: <span class="code-function">string</span>): <span class="code-function">boolean</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> ab = Buffer.<span class="code-function">from</span>(a);</span>
+<span class="code-line">  <span class="code-keyword">const</span> bb = Buffer.<span class="code-function">from</span>(b);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (ab.length !== bb.length) <span class="code-keyword">return</span> <span class="code-keyword">false</span>;</span>
+<span class="code-line">  <span class="code-keyword">return</span> <span class="code-function">timingSafeEqual</span>(ab, bb);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Compare the provided token to the real one&hellip;</p>
+              <p class="tl">turn both into raw byte buffers,</p>
+              <p class="tl"></p>
+              <p class="tl">bail early only on a length mismatch,</p>
+              <p class="tl">then compare with a function that takes the same time no matter what — no timing leak.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">Know the limit of your own work</strong>
+            <p>This guard proves <em>who</em> is calling (authentication). It deliberately does <span class="term" data-definition="Authorization decides what a specific user is allowed to do or see — e.g. only the owner of a shipment can view it. That needs a user/tenant model, which was out of scope here.">not</span> decide <em>which</em> shipments a caller may see (authorization). Naming that boundary out loud is exactly the &ldquo;documented assumptions&rdquo; the rubric wants.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Tests that actually mean something</h2>
+        <p>The test strategy is shaped like a pyramid: lots of fast pure-logic tests, fewer full end-to-end tests that exercise the real thing.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-success)">⚡</div><div><strong>147 unit tests</strong><p>Pure functions — mappers, reconciler, rules, status resolver — tested with plain objects in milliseconds, no database.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-info)">🗄️</div><div><strong>29 end-to-end tests</strong><p>The whole HTTP stack against a real, throwaway <span class="term" data-definition="Embedded Postgres spins up a real, temporary PostgreSQL database inside the test run and tears it down after — real database behavior with zero setup.">embedded Postgres</span> — real requests, real transactions.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-4)">🖥️</div><div><strong>17 frontend tests</strong><p>The browser-side document parser and filename detection, so bad files fail fast before they hit the server.</p></div></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The interview soundbite</strong>
+            <p>&ldquo;The riskiest logic — validation and reconciliation — is pure, so it gets the fastest and most thorough tests. End-to-end tests then prove the wiring and the real database transactions actually hold together.&rdquo;</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <div class="quiz-container" id="quiz-module5">
+          <div class="quiz-question-block"
+               data-correct="opt-generic"
+               data-explanation-right="Any unexpected throw becomes a generic 500 envelope with a stable code. The stack trace is logged server-side for engineers; the client sees nothing sensitive. That is the fire-door principle."
+               data-explanation-wrong="The whole point of the global filter is that internals never reach the client. Think about what gets logged versus what gets returned.">
+            <h3 class="quiz-question">A rule throws an unexpected error mid-validation. What does the API caller receive?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-stack" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The full stack trace and error message</span></button>
+              <button class="quiz-option" data-value="opt-generic" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A generic 500 envelope with a stable code; details are logged server-side</span></button>
+              <button class="quiz-option" data-value="opt-crash" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The server crashes and returns nothing</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-timing"
+               data-explanation-right="A naive comparison returns faster the sooner it finds a mismatch, leaking how many leading characters were correct. Constant-time comparison removes that signal so the token cannot be guessed incrementally."
+               data-explanation-wrong="It is not about speed or correctness of the match itself — both approaches say yes/no correctly. The concern is what an attacker can infer from how long the answer takes.">
+            <h3 class="quiz-question">Why compare the auth token in constant time instead of with a normal <code>===</code>?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-faster" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It is faster</span></button>
+              <button class="quiz-option" data-value="opt-timing" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It stops attackers from guessing the token by timing responses</span></button>
+              <button class="quiz-option" data-value="opt-case" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>It makes the comparison case-insensitive</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-e2e"
+               data-explanation-right="&lsquo;Approving a BLOCKED shipment returns 409&rsquo; spans controller, service, guard, database, and error filter — only an end-to-end test against a real database proves the whole path. A pure unit test cannot see the wiring."
+               data-explanation-wrong="This bug lives in how the layers and the database interact, not in a single pure function. Which kind of test exercises the real request path end to end?">
+            <h3 class="quiz-question">You want to guarantee &ldquo;a blocked shipment can never be approved.&rdquo; Which test gives the strongest proof?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-unit" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A unit test of the status resolver</span></button>
+              <button class="quiz-option" data-value="opt-e2e" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>An end-to-end test that POSTs approve and expects 409</span></button>
+              <button class="quiz-option" data-value="opt-none" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Manual clicking in the UI</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Last stop: defending your trade-offs and the path to a real production service. →</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">The Architecture, End to End</h1>
+      <p class="module-subtitle">Zoom out. The stack it runs on, the layers every request rides through, and the whole data flow in one picture &mdash; the answer to &ldquo;walk me through your architecture.&rdquo;</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: the subway network</h2>
+        <p>A metro looks chaotic from the platform, but it is deeply ordered. Every train rides a fixed line through the same stations in the same sequence. A control center coordinates them &mdash; no train freelances its own route. The rails, signals, and rolling stock are standard parts, so you can swap a train model without re-laying track.</p>
+        <p>This system is built the same way. Every request is a train. It rides one line through an ordered set of stations, a central wiring layer coordinates who talks to whom, and the parts are standard enough to replace one without disturbing the rest.</p>
+        <p>There are three zones the trains run between.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🖥️</div>
+            <div>
+              <strong>The Browser</strong>
+              <p>A React <span class="term" data-definition="An SPA (single-page application) is a website that loads once and then updates the screen in place as you click, instead of fetching a whole new page each time — it feels like an app, not a set of documents.">single-page app</span>. It parses files, draws the dashboard, and calls the backend over HTTP. It holds no business rules.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🛡️</div>
+            <div>
+              <strong>The API</strong>
+              <p>A NestJS server. Every rule, transaction, and decision lives here &mdash; behind a guarded, validated front door.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🗄️</div>
+            <div>
+              <strong>The Database</strong>
+              <p>PostgreSQL. The permanent record &mdash; shipments, documents, issues, reports, and an audit trail that is never erased.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">Say this in the interview</strong>
+            <p>&ldquo;It is a three-tier app: a React SPA, a NestJS API that owns all the logic, and Postgres for durable state. The browser is deliberately dumb &mdash; nothing important happens there.&rdquo;</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The tech stack: what the network runs on</h2>
+        <p>Nothing here is exotic. Every choice is boring, proven, and defensible &mdash; which is itself a senior signal. The backend uses <strong>pnpm</strong>; the frontend uses <strong>npm</strong>. Both are written in one language: <span class="term" data-definition="TypeScript is JavaScript with type labels. Those labels let the compiler catch whole classes of mistakes — a misspelled field, a wrong shape — before the code ever runs.">TypeScript</span>.</p>
+
+        <p class="translation-label" style="position:static; opacity:0.6; margin-bottom: var(--space-3)">BACKEND</p>
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🏗️</div>
+            <h4 class="pattern-title">NestJS 11</h4>
+            <p class="pattern-desc">The <span class="term" data-definition="A framework is a pre-built skeleton for an app — it decides the structure and wiring so you fill in the specific logic, instead of assembling everything from scratch.">framework</span>. Gives structure, dependency injection, and clean seams for guards, pipes, and filters. Runs on Express under the hood.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🐘</div>
+            <h4 class="pattern-title">PostgreSQL</h4>
+            <p class="pattern-desc">The database. Chosen for real transactions, native enums, and exact <code>Decimal</code> money math &mdash; things a compliance system cannot fake.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔌</div>
+            <h4 class="pattern-title">Prisma 7 + pg adapter</h4>
+            <p class="pattern-desc">The <span class="term" data-definition="An ORM (object-relational mapper) lets you read and write the database using normal code objects instead of hand-writing SQL — and it safely fills in values, which blocks SQL injection.">ORM</span>. Talks to Postgres through a swappable <span class="term" data-definition="A driver adapter is the small connector between the ORM and a specific database driver. Prisma 7 made it explicit and swappable — you can change how you connect without touching your queries.">driver adapter</span>, so every query is parameterized and safe.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">✔️</div>
+            <h4 class="pattern-title">class-validator</h4>
+            <p class="pattern-desc">Declares the exact shape each request must have. Unknown or malformed fields are rejected at the door with a 422, before any logic runs.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🛡️</div>
+            <h4 class="pattern-title">helmet · throttler</h4>
+            <p class="pattern-desc">Security headers and per-IP rate limiting, wired in globally. Cheap, standard defenses that a demo usually skips.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🧪</div>
+            <h4 class="pattern-title">Jest + supertest</h4>
+            <p class="pattern-desc">Unit tests for every pure function, plus end-to-end HTTP tests against a real throwaway Postgres. The safety net that made upgrades fearless.</p>
+          </div>
+        </div>
+
+        <p class="translation-label" style="position:static; opacity:0.6; margin: var(--space-6) 0 var(--space-3)">FRONTEND</p>
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚛️</div>
+            <h4 class="pattern-title">React 19</h4>
+            <p class="pattern-desc">Builds the UI from small components. The charts are hand-drawn SVG &mdash; zero charting libraries, zero bloat.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">⚡</div>
+            <h4 class="pattern-title">Vite 7</h4>
+            <p class="pattern-desc">The <span class="term" data-definition="A bundler packages your many source files into a few optimized files a browser can load fast. In development it also runs a quick local server with instant refresh.">bundler</span> and dev server. In development it proxies <code>/api</code> straight to the backend.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🧭</div>
+            <h4 class="pattern-title">React Router 7</h4>
+            <p class="pattern-desc">Maps URLs to pages &mdash; dashboard, shipment list, shipment detail &mdash; without full page reloads.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔬</div>
+            <h4 class="pattern-title">Vitest</h4>
+            <p class="pattern-desc">Unit tests the pure browser-side parsers &mdash; the code that turns a dropped CSV or JSON file into a clean payload.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: boring is a feature</strong>
+            <p>Every dependency here is mainstream and well-documented. When AI suggests an obscure library to solve a problem a standard tool already handles, that is your cue to push back. Fewer, proven parts means fewer surprises in production.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Every request rides the same rails</h2>
+        <p>A single request does not jump straight to the logic. It passes through a fixed line of stations &mdash; each one a small, focused layer with a single job. This ordering is not decoration; it is what keeps the messy concerns (auth, validation, formatting, errors) out of your business code.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in"><div class="step-num">1</div><div class="step-body"><strong>Guards</strong><p>The <span class="term" data-definition="A guard is a checkpoint that runs before your logic and decides yes or no — here: are you under the rate limit, and do you carry a valid token?">rate limiter and auth guard</span> decide if the request may proceed at all.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">2</div><div class="step-body"><strong>Validation Pipe</strong><p>A <span class="term" data-definition="A pipe transforms or checks incoming data before it reaches your code. This one rejects any request whose fields are missing, malformed, or unexpected.">pipe</span> rejects unknown or malformed fields &mdash; the logic only ever sees clean input.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">3</div><div class="step-body"><strong>Controller</strong><p>Thin. It reads the request, notes who is acting, and delegates. No business rules live here.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">4</div><div class="step-body"><strong>Service</strong><p>The brain. Orchestrates the pure logic and wraps writes in a transaction.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">5</div><div class="step-body"><strong>Repository → Prisma → Postgres</strong><p>The only code allowed to touch the database. Everything above it is database-agnostic.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">6</div><div class="step-body"><strong>Interceptor &amp; Filter</strong><p>On the way out, one <span class="term" data-definition="An interceptor wraps the response as it leaves — here it puts every successful result inside a consistent { data } envelope so the frontend always knows where to look.">interceptor</span> shapes every success; one <span class="term" data-definition="An exception filter catches any error thrown anywhere and turns it into a single, predictable error shape with a stable code — instead of leaking stack traces.">filter</span> catches every error.</p></div></div>
+        </div>
+
+        <p>The powerful part: those cross-cutting layers are wired <em>once</em>, globally, and every route inherits them. You never repeat auth or validation code per endpoint.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">app.module.ts</span>
+            <pre><code><span class="code-line"><span class="code-property">providers</span>: [</span>
+<span class="code-line">  { provide: APP_PIPE, useValue: <span class="code-keyword">new</span> <span class="code-function">ValidationPipe</span>(&hellip;) },</span>
+<span class="code-line">  { provide: APP_GUARD, useClass: ThrottlerGuard },</span>
+<span class="code-line">  { provide: APP_GUARD, useClass: ApiAuthGuard },</span>
+<span class="code-line">  { provide: APP_INTERCEPTOR, useClass: ResponseEnvelope },</span>
+<span class="code-line">  { provide: APP_FILTER, useClass: AllExceptionsFilter },</span>
+<span class="code-line">]</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Here is the wiring for the whole app&hellip;</p>
+              <p class="tl">reject malformed input everywhere,</p>
+              <p class="tl">throttle abusive callers by IP,</p>
+              <p class="tl">require a valid token (checked in constant time),</p>
+              <p class="tl">wrap every success in a tidy <code>{ data }</code> envelope,</p>
+              <p class="tl">turn every error into one predictable shape.</p>
+              <p class="tl">Declared once &mdash; every route gets all five for free.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: separation of concerns</strong>
+            <p>Thin controllers, smart services, and repositories that alone touch the database. Each layer has one reason to change. This is why you can tell AI &ldquo;put the rule in the service, not the controller&rdquo; and know exactly what you mean.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">One document, end to end</h2>
+        <p>Here is a real trip through the network &mdash; from dropping a file to seeing a verdict. Step through it. Notice how the pure core does the thinking with no database attached, and how the database and audit trail move together.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"You drop an invoice file. The browser parses it into clean JSON — no server call yet."},
+          {"highlight":"flow-actor-1","label":"The browser POSTs the document to the API.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"Guards, the rate limiter, and the validation pipe screen the request before any logic runs."},
+          {"highlight":"flow-actor-2","label":"The controller hands the payload to the service, which calls the pure core.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Pure functions map messy keys to canonical fields and decide fills versus conflicts. No database touched."},
+          {"highlight":"flow-actor-3","label":"In one transaction, the service writes the document and fills the empty shipment fields.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Every change appends an audit line — same transaction, all or nothing.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-3","label":"You click Run validation. Sixteen rules score the shipment and a status is resolved."},
+          {"highlight":"flow-actor-3","label":"A fresh readiness report is appended; the previous one is never overwritten.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"The API returns the real trace, and the browser replays it step by step.","packet":true,"from":"actor-4","to":"actor-1"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🖥️</div>
+              <span>Browser</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">🛡️</div>
+              <span>API Gate</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">⚙️</div>
+              <span>Pure Core</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">🗄️</div>
+              <span>Database</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">🧾</div>
+              <span>Audit Log</span>
+            </div>
+          </div>
+
+          <div class="flow-packet" id="flow-packet"></div>
+
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin</div>
+
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔍</div>
+          <div class="callout-content">
+            <strong class="callout-title">This animation is not faked</strong>
+            <p>The validation endpoint returns a real <code>trace</code> of the phases it actually ran. The frontend replays that &mdash; so what you see on screen is the true execution path, not a hand-drawn cartoon.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Seams, not spaghetti</h2>
+        <p>A few structural decisions are what let this system grow and change without becoming a knot. Each one creates a clean <em>seam</em> &mdash; a place you can cut and replace one part while everything around it stays put.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">shipment.repository.ts</span>
+            <pre><code><span class="code-line"><span class="code-function">update</span>(id, data, tx: PrismaTx = <span class="code-keyword">this</span>.prisma) {</span>
+<span class="code-line">  <span class="code-keyword">return</span> tx.shipment.<span class="code-function">update</span>({</span>
+<span class="code-line">    where: { id }, data,</span>
+<span class="code-line">  });</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Update one shipment by its id&hellip;</p>
+              <p class="tl">run it against whichever client you are handed&hellip;</p>
+              <p class="tl">a plain connection by default,</p>
+              <p class="tl">or a <span class="term" data-definition="A transaction groups several database writes so they all succeed or all fail together — never half-done. Like a bank transfer: money leaves one account only if it lands in the other.">transaction</span> when the caller passes one.</p>
+              <p class="tl">One method, works alone or inside a bigger atomic write.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">⚛️</div>
+            <h4 class="pattern-title">All-or-nothing writes</h4>
+            <p class="pattern-desc">Ingest and validate each wrap their writes in one transaction. A shipment never exists without its audit row; a half-finished run cannot corrupt state.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📖</div>
+            <h4 class="pattern-title">Bounded pagination</h4>
+            <p class="pattern-desc">Lists never load everything. <span class="term" data-definition="Keyset (cursor) pagination fetches the next page by pointing at the last row you saw, instead of counting past thousands of rows. It stays fast no matter how deep you scroll.">Keyset pagination</span> caps each page and stays fast at any depth.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🚦</div>
+            <h4 class="pattern-title">Config validated at boot</h4>
+            <p class="pattern-desc">Missing or malformed <span class="term" data-definition="Environment variables are settings passed in from outside the code — like the database address or a secret token — so you never hard-code them. Different values for dev and production.">environment variables</span> crash the app on startup with a clear message, not silently at 2am.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔌</div>
+            <h4 class="pattern-title">The database behind one service</h4>
+            <p class="pattern-desc">Only <code>PrismaService</code> knows how to connect. That is why the Prisma 7 driver-adapter upgrade was a one-line change with every test still green.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧩</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key insight: design for the swap</strong>
+            <p>Good architecture is not about predicting the future &mdash; it is about isolating each risky part behind a seam so that when it does change, the blast radius is one file. Transactions, the <span class="term" data-definition="The repository pattern puts all database access for one kind of data behind a small set of named methods, so the rest of the app asks for what it wants without knowing how it is stored.">repository pattern</span>, and the single database service are all seams.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+
+        <div class="quiz-container" id="quiz-module6">
+          <div class="quiz-question-block"
+               data-correct="opt-service"
+               data-explanation-right="Business rules belong in the service layer. The controller stays thin (read request, delegate), and the repository only touches the database. Knowing this lets you direct AI precisely — &lsquo;put this in the service, not the controller.&rsquo;"
+               data-explanation-wrong="Think about the single-job rule. Controllers just delegate; repositories only talk to the database. Business logic has exactly one home.">
+            <h3 class="quiz-question">You want to add a new business rule about how a shipment is approved. Which layer should hold it?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-controller" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The controller</span></button>
+              <button class="quiz-option" data-value="opt-service" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The service</span></button>
+              <button class="quiz-option" data-value="opt-repo" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The repository</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-txn"
+               data-explanation-right="A transaction makes the document write, the field fills, and the audit rows all commit together or not at all. Without it, a crash mid-way could leave a document saved but no audit trail — exactly the inconsistency a compliance system must never allow."
+               data-explanation-wrong="The property you want is all-or-nothing. Think about what guarantees the audit row can never go missing when the document write succeeds.">
+            <h3 class="quiz-question">During ingestion the server writes a document, fills shipment fields, and appends audit rows. What guarantees you never end up with only some of those?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-retry" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The frontend retries on failure</span></button>
+              <button class="quiz-option" data-value="opt-txn" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>All the writes run in a single database transaction</span></button>
+              <button class="quiz-option" data-value="opt-order" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>They are written in a careful order</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-seam"
+               data-explanation-right="Because only PrismaService knows how to connect to the database, swapping to the new Prisma 7 driver adapter touched one file. The tests proved nothing else broke. That is the payoff of isolating a risky part behind a seam."
+               data-explanation-wrong="The upgrade was small for an architectural reason, not luck. Think about how many places in the code actually know how the database connection is made.">
+            <h3 class="quiz-question">The Prisma 7 upgrade changed how the app connects to the database, yet it was a one-line change. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-luck" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The upgrade happened to be backward compatible</span></button>
+              <button class="quiz-option" data-value="opt-seam" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Only one service knows how to connect, so the change was isolated to it</span></button>
+              <button class="quiz-option" data-value="opt-nodb" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The app barely uses the database</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Next: how I actually worked &mdash; methodology, AI judgment, and problem-solving. &rarr;</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-7" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">07</span>
+      <h1 class="module-title">How I Worked</h1>
+      <p class="module-subtitle">The two things a 30-minute interview actually scores &mdash; how you break a problem down, and how you work &mdash; plus the AI-usage note the rubric requires.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">This interview is not a code review</h2>
+        <p>Thirty minutes is too short to read code together. So the room probes two things instead: <strong>problem-solving</strong> &mdash; how you turn a vague brief into a plan and handle the parts it does not spell out &mdash; and <strong>technical methodology</strong> &mdash; how you actually build, test, and use your tools. The code already exists; this is about the <em>thinking behind it</em>.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🧩</div>
+            <div>
+              <strong>Problem-solving</strong>
+              <p>Decompose the workflow, name the ambiguities, decide, and defend the decision with its reasoning &mdash; not with volume of features.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-4)">⚙️</div>
+            <div>
+              <strong>Technical methodology</strong>
+              <p>Test-first on the risky logic, small reviewable steps, and <span class="term" data-definition="Responsible AI usage means treating AI as a fast junior pair: useful for volume, but every suggestion is reviewed, tested, and owned by you. The rubric scores this explicitly.">responsible AI usage</span> you can explain line by line.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">What this maps to on the rubric</strong>
+            <p>Product &amp; workflow understanding (15), <strong>AI usage judgment (10)</strong>, and documentation &amp; communication (5) are decided almost entirely in the conversation &mdash; not in the diff. This module is how you win those points out loud.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Decomposition: skeleton first, then muscle</h2>
+        <p>A metaphor: you do not build a house room-by-room, fully finished. You raise the frame of the <em>whole</em> house first &mdash; foundation, walls, roof &mdash; then fit out each room. A thin end-to-end skeleton proves the shape before any single part is polished.</p>
+        <p>The brief lists a six-step workflow. The trap is to build it as horizontal layers (all the models, then all the services, then all the endpoints) and have nothing that runs until the very end. Instead it was sliced into <span class="term" data-definition="A vertical slice (or tracer bullet) is a thin feature that goes all the way through every layer — API, logic, database — so you have something running end-to-end early, then thicken it.">vertical slices</span> &mdash; each one shippable on its own.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in"><div class="step-num">1</div><div class="step-body"><strong>Walking skeleton</strong><p>Create a shipment + append one audit row, end to end, with a test. The whole spine in miniature.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">2</div><div class="step-body"><strong>Ingest &amp; map</strong><p>Take mock document JSON, normalize keys, fill empty fields. Now data flows in.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">3</div><div class="step-body"><strong>Validate</strong><p>The rule engine and severity ladder &mdash; the highest-risk, highest-value logic gets its own slice.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">4</div><div class="step-body"><strong>Report &amp; harden</strong><p>Readiness report, then the production concerns &mdash; errors, security, tests &mdash; layered on a working core.</p></div></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Say this in the interview</strong>
+            <p>&ldquo;I built vertical slices, not horizontal layers &mdash; a create-plus-audit skeleton first, then ingest, then validation. I always had something that ran end-to-end, so every later step was a small, testable addition instead of a big-bang integration at the end.&rdquo;</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The spec is vague on purpose &mdash; so decide, and write it down</h2>
+        <p>A brief that says &ldquo;suspicious invoice value&rdquo; without a number is testing whether you notice the gap, make a defensible call, and <em>document</em> it. Guessing silently is the junior move; naming the assumption is the senior one &mdash; and it is a scored rubric line.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">💰</div>
+            <h4 class="pattern-title">&ldquo;Suspicious&rdquo; invoice value</h4>
+            <p class="pattern-desc"><strong>Gap:</strong> no threshold given. <strong>Call:</strong> flag non-positive or implausibly out-of-range values as a warning, not a hard block &mdash; a human confirms. <strong>Why:</strong> false positives here are cheap; false blocks stall real cargo.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📅</div>
+            <h4 class="pattern-title">&ldquo;Allowed review window&rdquo;</h4>
+            <p class="pattern-desc"><strong>Gap:</strong> how old is too old? <strong>Call:</strong> made it a configurable <code>REVIEW_WINDOW_DAYS</code>, not a magic number. <strong>Why:</strong> the policy is a business setting, so it belongs in config, not baked into a rule.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">⚖️</div>
+            <h4 class="pattern-title">Gross vs. net weight</h4>
+            <p class="pattern-desc"><strong>Gap:</strong> exact-equal, or a tolerance? <strong>Call:</strong> gross below net is a hard error; a small <code>WEIGHT_TOLERANCE_PCT</code> absorbs rounding. <strong>Why:</strong> real documents round; the rule must not cry wolf.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔢</div>
+            <h4 class="pattern-title">HS code validity</h4>
+            <p class="pattern-desc"><strong>Gap:</strong> format only, or real classification? <strong>Call:</strong> validate the format now; treat a real WCO lookup as a documented, mocked seam. <strong>Why:</strong> the brief says mocked snapshots are fine &mdash; and honesty about scope beats faking a data source.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📝</div>
+          <div class="callout-content">
+            <strong class="callout-title">The pattern that scores</strong>
+            <p>Every one of these is: <em>name the gap → make a call → give the reason → name what would change it.</em> That four-beat structure is the same one that defends a trade-off &mdash; it is the shape of engineering judgment.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Methodology: test the risk first, commit in small steps</h2>
+        <p>The method was not &ldquo;write everything, then test.&rdquo; The riskiest logic &mdash; the pure mappers, the reconciler, the rules, the status resolver &mdash; was written <span class="term" data-definition="Test-Driven Development (TDD): write a failing test that specifies the behavior, make it pass with the simplest code, then refactor. The test is the spec, and the safety net.">test-first</span>. Each rule began as a red test describing the exact issue it should raise.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">THE LOOP</span>
+            <pre><code><span class="code-line"><span class="code-comment">// 1. RED — describe the behavior, watch it fail</span></span>
+<span class="code-line">expect(<span class="code-function">runRule</span>(shipmentWithGrossBelowNet))</span>
+<span class="code-line">  .toContainIssue(<span class="code-string">'GROSS_LT_NET'</span>, <span class="code-string">'high'</span>);</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-comment">// 2. GREEN — simplest code that passes</span></span>
+<span class="code-line"><span class="code-comment">// 3. REFACTOR — clean up, tests still green</span></span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">First, write a test that says what a broken shipment should do&hellip;</p>
+              <p class="tl">assert the exact issue code and severity&hellip;</p>
+              <p class="tl"></p>
+              <p class="tl">watch it fail for the right reason,</p>
+              <p class="tl">then write just enough code to make it pass,</p>
+              <p class="tl">then tidy up &mdash; the test proves you did not break it.</p>
+            </div>
+          </div>
+        </div>
+
+        <p>Because the risky logic is <strong>pure</strong> (no database, no framework), those tests run in milliseconds &mdash; which is why there are <strong>147</strong> of them. End-to-end tests then prove the wiring and the real transactions hold. Work landed in <span class="term" data-definition="Small, focused commits each do one thing and are easy to review and revert. A reviewer can follow the reasoning commit-by-commit instead of facing one giant diff.">small, reviewable commits</span> &mdash; a create-plus-audit slice, then ingest, then each rule &mdash; not one giant drop.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">The interview soundbite</strong>
+            <p>&ldquo;I pushed the compliance logic into pure functions and tested it first. That is where the correctness risk lives, so that is where the fastest, densest tests are &mdash; and it kept the framework and database out of my most important decisions.&rdquo;</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">AI-usage judgment: the note the rubric requires</h2>
+        <p>The brief scores this at <strong>10 points</strong> and demands a written note. The bar is not &ldquo;did you avoid AI&rdquo; &mdash; it is &ldquo;can you show you used it responsibly and own every line.&rdquo; Below is the honest structure. <strong>The bracketed parts are yours to make specific before the interview.</strong></p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🛠️</div>
+            <h4 class="pattern-title">Which tools</h4>
+            <p class="pattern-desc">&ldquo;I used <strong>[Claude Code / Cursor / Copilot]</strong> for scaffolding, boilerplate, and first-draft tests.&rdquo; Name them plainly &mdash; the policy expects it.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🤝</div>
+            <h4 class="pattern-title">Which parts were AI-assisted</h4>
+            <p class="pattern-desc">&ldquo;AI drafted <strong>[the DTOs, the repository boilerplate, the test scaffolds]</strong>; I authored the validation rules, the reconciliation policy, and the data model myself.&rdquo;</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🔍</div>
+            <h4 class="pattern-title">How I reviewed &amp; corrected it</h4>
+            <p class="pattern-desc">&ldquo;Every AI change had to pass a test I understood. I read each diff, ran the suite, and <strong>[rewrote / renamed / tightened]</strong> anything I could not explain out loud.&rdquo;</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">✋</div>
+            <h4 class="pattern-title">Where I overrode it</h4>
+            <p class="pattern-desc">Concrete rejections you can defend &mdash; see the examples below. This is the single strongest signal in the whole section.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">✎</div>
+          <div class="callout-content">
+            <strong class="callout-title">Real overrides you can already defend</strong>
+            <p>These are grounded in choices actually in the code &mdash; keep the ones that are true for you:</p>
+            <ul style="margin: var(--space-3) 0 0; padding-left: var(--space-6); line-height: 1.7">
+              <li><strong>Money as <code>Decimal</code>, not <code>float</code>:</strong> &ldquo;A float suggestion would have quietly corrupted invoice math; I used Postgres <code>Decimal</code> for exact currency.&rdquo;</li>
+              <li><strong>Boring, proven deps:</strong> &ldquo;When an obscure library was suggested for a job a standard tool already does, I kept the mainstream one &mdash; fewer surprises in production.&rdquo;</li>
+              <li><strong>Rule in the service, not the controller:</strong> &ldquo;I direct AI to the right layer instead of accepting logic wherever it lands.&rdquo;</li>
+              <li><strong>[Your own example]:</strong> the place you disagreed and why &mdash; the interviewer will love a specific one.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The trap to avoid</strong>
+            <p>&ldquo;Blindly generated code that the candidate cannot explain is a serious red flag.&rdquo; The defense is not to hide AI &mdash; it is to be able to open <em>any</em> file and explain why every important line is there. If you cannot, learn it before the interview, or rewrite it until you can.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Problem-solving in action: how I corner a hard bug</h2>
+        <p>&ldquo;Tell me about a tricky bug&rdquo; is a problem-solving question in disguise. They are not testing the bug &mdash; they are testing your <em>method</em>. A senior method is boringly systematic, and it looks the same every time.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-1)">🔁</div><div><strong>Reproduce first</strong><p>No fix before a reliable repro. A pure-function design helps &mdash; feed it the exact input and the failure is deterministic.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-2)">✂️</div><div><strong>Isolate</strong><p>Halve the surface. Is it the mapper, the rule, or the transaction? Narrow until one component owns the failure.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-3)">💡</div><div><strong>Hypothesize, change one thing</strong><p>State what you think is wrong, change exactly one variable, and check &mdash; never shotgun several edits at once.</p></div></div>
+          <div class="icon-row animate-in"><div class="icon-circle" style="background: var(--color-actor-4)">🔒</div><div><strong>Lock it with a test</strong><p>The fix is not done until a regression test would have caught it. The bug never comes back silently.</p></div></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">✎</div>
+          <div class="callout-content">
+            <strong class="callout-title">Bring one real war story</strong>
+            <p>Have a 60-second story ready that walks this exact arc on a bug <em>you</em> hit &mdash; <strong>[the reconciliation conflict that surfaced a wrong field, the rule that double-counted an issue, the transaction boundary you got wrong first]</strong>. Structure it: symptom → how I reproduced it → how I isolated it → the one-line cause → the regression test that now guards it. The arc is the point; the bug is just the vehicle.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Check your understanding</h2>
+        <p>These mirror how the two axes are actually probed &mdash; reason like you would in the room.</p>
+
+        <div class="quiz-container" id="quiz-module7">
+          <div class="quiz-question-block"
+               data-correct="opt-vertical"
+               data-explanation-right="Vertical slices keep something running end-to-end from day one, so integration risk is paid down continuously instead of all at once at the end. Each later step is a small, testable addition — which is exactly the methodology signal the interview wants."
+               data-explanation-wrong="Building all models, then all services, then all endpoints leaves nothing that runs until the very end — the riskiest possible integration order. Think about when you first have something working end-to-end.">
+            <h3 class="quiz-question">You have the six-step workflow to build. What ordering shows the strongest methodology?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-layers" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>All data models first, then all services, then all endpoints</span></button>
+              <button class="quiz-option" data-value="opt-vertical" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A thin end-to-end skeleton first, then thicken one vertical slice at a time</span></button>
+              <button class="quiz-option" data-value="opt-hardest" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>The hardest feature first, in full, before anything else runs</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-own"
+               data-explanation-right="The rubric rewards responsible use, not avoidance. The winning answer names the tools, says what was AI-assisted, and proves you reviewed and own every line — ideally with a concrete override. Hiding AI or blindly trusting it are the two failing extremes."
+               data-explanation-wrong="Neither hiding AI nor accepting all of it scores well. Re-read the policy: it wants named tools, reviewed output, and decisions you can defend — responsibility, not avoidance.">
+            <div class="scenario-context">
+              <span class="scenario-label">Scenario</span>
+              <p>&ldquo;This policy allows AI tools. How did you use them here?&rdquo;</p>
+            </div>
+            <h3 class="quiz-question">Best response?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-none" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;I avoided AI so all the code is definitely mine.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-own" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;I used it for boilerplate and first-draft tests, reviewed every diff against a test I understood, and here is a case where I overrode it &mdash; Decimal over float for money.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-all" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;I let it generate most of it; it mostly worked.&rdquo;</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-repro"
+               data-explanation-right="A reliable reproduction turns a vague bug into a deterministic one you can attack and, crucially, into a regression test that proves the fix and guards against relapse. Fixing before you can reproduce is guessing."
+               data-explanation-wrong="Jumping straight to a fix, or changing several things at once, is the shotgun approach — you cannot tell what worked or prove it stays fixed. Think about what has to come before any fix.">
+            <div class="scenario-context">
+              <span class="scenario-label">Scenario</span>
+              <p>&ldquo;A validation run occasionally produces the wrong status. Where do you start?&rdquo;</p>
+            </div>
+            <h3 class="quiz-question">First move?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-patch" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Patch the status resolver where it looks wrong and redeploy</span></button>
+              <button class="quiz-option" data-value="opt-repro" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Build a reliable reproduction, then let it become the regression test</span></button>
+              <button class="quiz-option" data-value="opt-log" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Add logging everywhere and wait for it to happen again in production</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module7')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module7')">Try Again</button>
+        </div>
+
+        <p style="margin-top: var(--space-8); color: var(--color-text-secondary)">Last stop: defend your trade-offs and the credible path to production. &rarr;</p>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-8" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">08</span>
+      <h1 class="module-title">Take-Home &rarr; Production</h1>
+      <p class="module-subtitle">The closer. Every deferred decision is a choice you can defend — and a credible path to a real service.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A metaphor: the concept car</h2>
+        <p>A concept car drives. It proves the design. But before it rolls off a production line it needs crash-testing, a supply chain, and manufacturing at scale. Nobody faults a concept car for not being a Camry — they judge whether the ideas are sound.</p>
+        <p>Your take-home is the concept car. The interview is where you show you know exactly what the production line would add.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">The rubric&rsquo;s real ask</strong>
+            <p>&ldquo;A credible path from take-home to production service&rdquo; plus &ldquo;documented assumptions.&rdquo; Translation: name your trade-offs before they do, and have the next step ready.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The trade-offs, out loud</h2>
+        <p>Four deliberate simplifications. For each: what it is, why it was fine here, and what would change it.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">👁️</div>
+            <h4 class="pattern-title">No real OCR</h4>
+            <p class="pattern-desc"><strong>Why fine:</strong> the brief said mock data; a browser parser handles JSON/CSV/text. <strong>Next:</strong> the Field Mapper is already the clean seam to plug a real <span class="term" data-definition="OCR (Optical Character Recognition) turns an image or scanned PDF into machine-readable text. It would sit in front of the mapper, converting a scanned invoice into the JSON the mapper already understands.">OCR</span> service into.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔁</div>
+            <h4 class="pattern-title">Recompute all rules</h4>
+            <p class="pattern-desc"><strong>Why fine:</strong> simple, correct, easy to reason about at this scale. <strong>Next:</strong> if the rule set or volume explodes, move to incremental evaluation — behind the same interface.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📊</div>
+            <h4 class="pattern-title">Coarse severity ladder</h4>
+            <p class="pattern-desc"><strong>Why fine:</strong> four levels give a clear, testable verdict. <strong>Next:</strong> swap the pure resolver for a score-based policy — rules and engine untouched.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔓</div>
+            <h4 class="pattern-title">Auth, not authorization</h4>
+            <p class="pattern-desc"><strong>Why fine:</strong> a token gate closes the &ldquo;world-callable&rdquo; hole. <strong>Next:</strong> a user/tenant model for per-owner access — the biggest gap for multi-customer use.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Proof you can evolve it: the Prisma 7 upgrade</h2>
+        <p>A newer database library removed the old way of connecting and required a <span class="term" data-definition="A driver adapter is a small piece that lets the ORM talk to the database through a specific database driver. Prisma 7 made these mandatory, replacing the old connection-string-in-schema approach.">driver adapter</span>. The migration was surgical — one line in the connection setup — and every test still passed.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">prisma.service.ts</span>
+            <pre><code><span class="code-line"><span class="code-function">constructor</span>(config: AppConfigService) {</span>
+<span class="code-line">  <span class="code-keyword">super</span>({ adapter: <span class="code-keyword">new</span> <span class="code-function">PrismaPg</span>({</span>
+<span class="code-line">    connectionString: config.databaseUrl,</span>
+<span class="code-line">  }) });</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">When the database client is created&hellip;</p>
+              <p class="tl">connect it through the new Postgres driver adapter&hellip;</p>
+              <p class="tl">using the connection string from typed config.</p>
+              <p class="tl">One seam changed; the 176 tests were the safety net.</p>
+              <p class="tl"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why this story lands</strong>
+            <p>It shows you can absorb a breaking dependency change without fear — because the architecture isolated the database behind one service and the tests proved nothing else broke. That <em>is</em> production maturity.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The production roadmap</h2>
+        <p>If Safiri said &ldquo;ship it,&rdquo; here is the order of work — highest-leverage first.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in"><div class="step-num">1</div><div class="step-body"><strong>Per-owner authorization</strong><p>A user/tenant model so a caller only sees their own shipments — the top gap for real multi-customer use.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">2</div><div class="step-body"><strong>Async ingestion + real OCR</strong><p>Move heavy document processing onto a <span class="term" data-definition="A queue holds work to be done later so the API can respond immediately while a background worker processes slow jobs like OCR — keeping the app responsive under load.">queue</span> with background workers, so a slow scan never blocks a request.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">3</div><div class="step-body"><strong>Observability</strong><p>Metrics, tracing, and dashboards so you can see rule failure rates and latency in production, not guess.</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">4</div><div class="step-body"><strong>Richer policy engine</strong><p>Replace the four-level ladder with configurable, per-customer compliance policies — without touching the rules.</p></div></div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Defend a decision</h2>
+        <p>These mirror the pushback an interviewer gives. Pick the answer a senior engineer would give.</p>
+
+        <div class="quiz-container" id="quiz-module8">
+          <div class="quiz-question-block"
+               data-correct="opt-simple"
+               data-explanation-right="You justify the choice by its context (scale, clarity, correctness) and show you know the upgrade path exists behind the same interface. That is a trade-off defended, not a limitation apologized for."
+               data-explanation-wrong="Avoid either extreme — blindly defending or immediately caving. The senior move is to justify the choice for the current context and name the concrete condition that would change it.">
+            <div class="scenario-context">
+              <span class="scenario-label">Scenario</span>
+              <p>&ldquo;Recomputing every rule on every validation run seems wasteful. Why did you do that?&rdquo;</p>
+            </div>
+            <h3 class="quiz-question">Best response?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-defensive" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;It is not wasteful, it is fine.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-simple" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;At this scale it is simpler and provably correct; if volume grows I would go incremental behind the same interface.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-cave" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;You are right, that was a mistake.&rdquo;</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-seam"
+               data-explanation-right="Because the mapper already turns arbitrary document JSON into canonical fields, OCR just needs to produce that JSON. You add a step in front; nothing downstream changes. Point at the existing seam."
+               data-explanation-wrong="You would not rewrite the validation or reconciliation to add OCR. Think about where document text first enters the system and what already consumes it.">
+            <div class="scenario-context">
+              <span class="scenario-label">Scenario</span>
+              <p>&ldquo;A customer wants to upload scanned PDF invoices, not JSON. How much of this do you rewrite?&rdquo;</p>
+            </div>
+            <h3 class="quiz-question">Best response?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-rewrite" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;Most of the validation engine would need changes.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-seam" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;Add an OCR step that outputs the same JSON the Field Mapper already ingests — everything downstream is unchanged.&rdquo;</span></button>
+              <button class="quiz-option" data-value="opt-new" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>&ldquo;I would build a separate app for PDFs.&rdquo;</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-authz"
+               data-explanation-right="The auth guard proves who is calling, but nothing yet restricts which shipments a caller can see. For multiple customers on one system, per-owner authorization is the first thing to close — and you already flagged it as out of scope."
+               data-explanation-wrong="Rate limiting and error handling are already in place. The unguarded risk for a multi-customer deployment is that any authenticated caller could read anyone&rsquo;s data.">
+            <div class="scenario-context">
+              <span class="scenario-label">Scenario</span>
+              <p>&ldquo;We want to run this for fifty freight customers on one deployment. What is the first thing you must add?&rdquo;</p>
+            </div>
+            <h3 class="quiz-question">Best response?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-rate" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>More rate limiting</span></button>
+              <button class="quiz-option" data-value="opt-authz" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>Per-owner authorization — a user/tenant model so customers only see their own shipments</span></button>
+              <button class="quiz-option" data-value="opt-cache" onclick="selectOption(this)"><div class="quiz-option-radio"></div><span>A caching layer</span></button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module8')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module8')">Try Again</button>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Your 30-second walkthrough</h2>
+        <p>If they open with &ldquo;tell me about what you built,&rdquo; this is the spine — hits every rubric point in order.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in"><div class="step-num">1</div><div class="step-body"><strong>Model</strong><p>&ldquo;A canonical Shipment as the source of truth, with documents as a separate first-class layer for provenance and mismatch detection.&rdquo;</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">2</div><div class="step-body"><strong>Ingest</strong><p>&ldquo;Pure mapper + reconciler normalize messy documents and fill empty fields without ever overwriting the record.&rdquo;</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">3</div><div class="step-body"><strong>Validate</strong><p>&ldquo;An open/closed rule engine, stateless recompute with durable waivers, and a deterministic severity-to-status verdict.&rdquo;</p></div></div>
+          <div class="step-card animate-in"><div class="step-num">4</div><div class="step-body"><strong>Harden &amp; defend</strong><p>&ldquo;Stable error envelope, layered security, a real test pyramid — and here are the trade-offs I chose and would revisit.&rdquo;</p></div></div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎓</div>
+          <div class="callout-content">
+            <strong class="callout-title">You are ready</strong>
+            <p>You can now trace the data end-to-end, name every design decision, and defend each trade-off with its reasoning and its upgrade path. That is exactly what &ldquo;understand, review, and defend every important decision&rdquo; means. Go get it.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+  </main>
+
+</body>
+</html>
