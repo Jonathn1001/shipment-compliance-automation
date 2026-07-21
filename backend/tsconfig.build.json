@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": "src" },
+  // rootDir keeps the entry at dist/main.js. incremental:false avoids the
+  // deleteOutDir + stale .tsbuildinfo footgun: nest wipes dist on start, so a
+  // surviving tsbuildinfo would make tsc skip emit and leave no dist/main.
+  "compilerOptions": { "rootDir": "src", "incremental": false },
   "exclude": ["node_modules", "test", "dist", "prisma", "prisma.config.ts", "**/*spec.ts"]
 }
