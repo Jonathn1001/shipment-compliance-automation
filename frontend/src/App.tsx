@@ -1,16 +1,19 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { NewShipmentModal } from './components/NewShipmentModal';
 import { Sidebar } from './components/Sidebar';
 
 export function App() {
+  const [creating, setCreating] = useState(false);
   return (
     <div className="shell">
       <Sidebar />
       <div className="workspace">
         <header className="topbar">
           <span className="tb-title">Shipment Compliance Console</span>
-          <span className="tb-sub">read-only · demo</span>
+          <span className="tb-sub">demo</span>
           <div className="tb-right">
-            <button className="btn" disabled title="Create flow is not part of this demo">
+            <button className="btn" onClick={() => setCreating(true)}>
               + New Shipment
             </button>
             <div className="user">
@@ -26,6 +29,7 @@ export function App() {
           <Outlet />
         </main>
       </div>
+      {creating && <NewShipmentModal onClose={() => setCreating(false)} />}
     </div>
   );
 }

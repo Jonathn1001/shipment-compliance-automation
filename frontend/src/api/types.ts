@@ -13,6 +13,22 @@ export type DocumentType =
   | 'OTHER';
 export type SourceType = 'JSON' | 'OCR' | 'API' | 'CSV';
 
+/**
+ * Body for `POST /shipments`. Only `shipmentReference` is required; every other
+ * field is optional (a shipment can start partial and be hydrated from documents).
+ */
+export interface CreateShipmentInput {
+  shipmentReference: string;
+  importer?: string;
+  exporter?: string;
+  goodsDescription?: string;
+  hsCode?: string;
+  countryOfOrigin?: string;
+  invoiceValue?: number;
+  currency?: string;
+  packagingType?: string;
+}
+
 /** Body for `POST /shipments/:id/documents`. `payload` is freeform mock data. */
 export interface IngestDocumentInput {
   documentType: DocumentType;

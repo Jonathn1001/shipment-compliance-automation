@@ -1,5 +1,6 @@
 import type {
   AuditLog,
+  CreateShipmentInput,
   DocumentIngestion,
   IngestDocumentInput,
   ReadinessReport,
@@ -62,6 +63,8 @@ export const api = {
   // page. A page shorter than `limit` means the end has been reached.
   listShipments: (params?: { limit?: number; cursor?: string }) =>
     request<ShipmentListRow[]>(`/shipments${qs(params)}`),
+  createShipment: (input: CreateShipmentInput) =>
+    request<Shipment>('/shipments', { method: 'POST', body: JSON.stringify(input) }),
   getStats: () => request<ShipmentStats>('/shipments/stats'),
   getShipment: (id: string) => request<Shipment>(`/shipments/${id}`),
   getDocuments: (id: string) => request<DocumentIngestion[]>(`/shipments/${id}/documents`),
